@@ -22,9 +22,9 @@ def distance(pos1, pos2):
     return math.sqrt((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)
 
 class Agent:
-    def __init__(self, beehive_pos, start_pos=None):
+    def __init__(self, beehive_pos):
         self.beehive_position = beehive_pos
-        self.start_position = start_pos if start_pos else beehive_pos
+        self.start_position = beehive_pos  # Always start at beehive
         self.reset()
         
     def reset(self):
@@ -41,29 +41,45 @@ class Agent:
         self.returned_home = False
         
     def get_sensor_data(self, reward_pos):
-        # Simplified and more direct sensor data
-        dx_reward = (reward_pos[0] - self.x) / WIDTH if self.vision_active else 0
-        dy_reward = (reward_pos[1] - self.y) / HEIGHT if self.vision_active else 0
+        """
+        Returns sensor data formatted for vector integration learning:
+        8 inputs total:
+        - Current heading vector (2)
+        - Path integration  vector (2)
+        - Target vector (2, zeroed when not visible)
+        - Binary state flags (2)
+        """
+        # Current heading as vector components
+        heading_x = math.cos(math.radians(self.angle))
+        heading_y = math.sin(math.radians(self.angle))
         
-        dx_home = (self.beehive_position[0] - self.x) / WIDTH
-        dy_home = (self.beehive_position[1] - self.y) / HEIGHT
+        # Path integration (sum of recent movement vectors)
+        path_x, path_y = 0, 0
+        if len(self.path_positions) > 1:
+            # Get last 20 steps or all available steps
+            path_window = self.path_positions[-20:]
+            for i in range(1, len(path_window)):
+                dx = (path_window[i][0] - path_window[i-1][0]) / MOVE_SPEED
+                dy = (path_window[i][1] - path_window[i-1][1]) / MOVE_SPEED
+                path_x += dx
+                path_y += dy
         
-        # Simplified angle calculations
-        reward_angle = math.degrees(math.atan2(dy_reward, dx_reward)) % 360
-        home_angle = math.degrees(math.atan2(dy_home, dx_home)) % 360
-        
-        relative_reward_angle = ((reward_angle - self.angle) % 360) / 360
-        relative_home_angle = ((home_angle - self.angle) % 360) / 360
+        # Target vector (only if visible)
+        if self.vision_active:
+            target_x = (reward_pos[0] - self.x) / WIDTH
+            target_y = (reward_pos[1] - self.y) / HEIGHT
+        else:
+            target_x = 0
+            target_y = 0
         
         return [
-            dx_reward, dy_reward,    # Vector to reward
-            dx_home, dy_home,        # Vector to home
-            relative_reward_angle,    # Angle to reward
-            relative_home_angle,      # Angle to home
+            heading_x, heading_y,      # Current heading vector
+            path_x, path_y,           # Integrated path vector
+            target_x, target_y,       # Target direction (if visible)
             1.0 if self.carrying_reward else 0.0,  # Carrying state
             1.0 if self.vision_active else 0.0     # Vision state
         ]
-    
+        
     def update(self, action, reward_pos):
         # Interpret neural network outputs
         rotate = action[0]  # -1 to 1
@@ -130,16 +146,7 @@ def eval_genome(genome, config):
             random.randint(BEEHIVE_SIZE, HEIGHT - BEEHIVE_SIZE)
         )
         
-        # Random start position (different from beehive)
-        while True:
-            start_pos = (
-                random.randint(AGENT_SIZE, WIDTH - AGENT_SIZE),
-                random.randint(AGENT_SIZE, HEIGHT - AGENT_SIZE)
-            )
-            if distance(start_pos, beehive_pos) >= 50:  # Minimum distance from beehive
-                break
-                
-        agent = Agent(beehive_pos, start_pos)
+        agent = Agent(beehive_pos)  # Changed: only pass beehive_pos
         
         # Random reward position with constraints
         while True:
@@ -148,10 +155,9 @@ def eval_genome(genome, config):
                 random.randint(REWARD_SIZE, HEIGHT - REWARD_SIZE)
             )
             dist_to_home = distance(beehive_pos, reward_pos)
-            dist_to_start = distance(start_pos, reward_pos)
-            if 50 <= dist_to_home <= 150 and 50 <= dist_to_start <= 150:
+            if 50 <= dist_to_home <= 150:  # Only check distance to beehive
                 break
-        
+                        
         # Increase circular motion penalty
         energy = 1000
         total_distance = 0
@@ -178,7 +184,7 @@ def eval_genome(genome, config):
             if len(last_angles) >= 10:
                 angle_diff = abs(last_angles[-1] - last_angles[0])
                 if angle_diff > 330 or angle_diff < 30:  # Almost complete circle
-                    energy -= 50  # Much stronger penalty
+                    energy -= 500  # Much stronger penalty
             
             # Basic movement energy costs
             energy -= dist_moved
@@ -291,16 +297,7 @@ def visualize_agent(net, config, max_steps=None):
                 random.randint(BEEHIVE_SIZE, HEIGHT - BEEHIVE_SIZE)
             )
             
-            # Random start position
-            while True:
-                start_pos = (
-                    random.randint(AGENT_SIZE, WIDTH - AGENT_SIZE),
-                    random.randint(AGENT_SIZE, HEIGHT - AGENT_SIZE)
-                )
-                if distance(start_pos, self.beehive_pos) >= 50:
-                    break
-                    
-            self.agent = Agent(self.beehive_pos, start_pos)
+            self.agent = Agent(self.beehive_pos)  # Changed: only pass beehive_pos
             
             # Random reward position
             while True:
@@ -309,8 +306,7 @@ def visualize_agent(net, config, max_steps=None):
                     random.randint(REWARD_SIZE, HEIGHT - REWARD_SIZE)
                 )
                 dist_to_home = distance(self.beehive_pos, self.reward_pos)
-                dist_to_start = distance(start_pos, self.reward_pos)
-                if 50 <= dist_to_home <= 150 and 50 <= dist_to_start <= 150:
+                if 50 <= dist_to_home <= 150:  # Only check distance to beehive
                     break
 
     state = AnimationState()
@@ -406,7 +402,7 @@ def visualize_agent(net, config, max_steps=None):
 
 def main():
     # Run NEAT with periodic visualization
-    winner, config = run_neat_with_visualization(checkpoint_frequency=50)
+    winner, config = run_neat_with_visualization(checkpoint_frequency=75)
     
     # Final visualization of the best agent
     print("\nFinal visualization of best agent:")
