@@ -72,6 +72,7 @@ class Agent:
             target_x = 0
             target_y = 0
         
+        # Use angle and distance, instead of Cartesian coordinates
         return [
             heading_x, heading_y,      # Current heading vector
             path_x, path_y,           # Integrated path vector
