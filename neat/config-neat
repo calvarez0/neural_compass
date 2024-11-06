@@ -1,6 +1,6 @@
 [NEAT]
 fitness_criterion     = max
-fitness_threshold     = 2500
+fitness_threshold     = 1000000000
 pop_size             = 150
 reset_on_extinction  = True
 
@@ -12,18 +12,18 @@ activation_options     = tanh sigmoid relu
 
 # node add/remove rates
 node_add_prob          = 0.3
-node_delete_prob       = 0.2
+node_delete_prob       = 0.1
 
 # network parameters
 num_hidden              = 4
-num_inputs             = 8
+num_inputs             = 17
 num_outputs            = 2
-initial_connection     = partial_direct 0.5
-feed_forward          = True
+initial_connection     = full_direct
+feed_forward          = False
 
 # connection add/remove rates
-conn_add_prob          = 0.5
-conn_delete_prob       = 0.5
+conn_add_prob          = 0.3
+conn_delete_prob       = 0.1
 
 # connection enable options
 enabled_default         = True
