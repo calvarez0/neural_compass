@@ -159,7 +159,7 @@ def run_neat_with_visualization(checkpoint_frequency=50):
         if generation % 50 == 0:
             print(f"Plotting champion topology at generation {generation}")
             visualize_network_topology(best_genome, config, generation)
-            # save_agent_simulation(neat.nn.FeedForwardNetwork.create(best_genome, config), config, generation)
+            save_agent_simulation(neat.nn.FeedForwardNetwork.create(best_genome, config), config, generation)
 
         # Visualize current best
         print(f"\nGeneration {generation}")
