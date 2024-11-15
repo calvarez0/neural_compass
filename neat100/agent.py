@@ -1,3 +1,5 @@
+# neat100/agent.py
+
 import os
 import neat
 import math
@@ -134,7 +136,7 @@ class Agent:
         
         path_x, path_y = 0, 0
         if len(self.path_positions) > 1:
-            path_window = self.path_positions[-40:]
+            path_window = self.path_positions[-20:]  # modify memory here
             for i in range(1, len(path_window)):
                 dx = (path_window[i][0] - path_window[i-1][0]) / MOVE_SPEED
                 dy = (path_window[i][1] - path_window[i-1][1]) / MOVE_SPEED

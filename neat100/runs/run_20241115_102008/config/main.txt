@@ -1,5 +1,3 @@
-# neat100/main.py
-
 import os
 import neat
 import math

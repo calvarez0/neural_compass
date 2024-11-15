@@ -1,5 +1,3 @@
-# neat100/main.py
-
 import os
 import neat
 import math
@@ -135,20 +133,13 @@ def eval_genome(genome, config):
         # Energy efficiency bonus
         fitness += agent.energy
         
-        # Non-linear distance penalties
+        # Distance penalties
         if not agent.found_reward:
-            # Exponentially decreasing penalty for distance to reward
-            # As distance approaches 0, penalty becomes very small
-            # Base penalty is higher when far away
             dist_to_reward = distance((agent.x, agent.y), reward_pos)
-            distance_factor = 1 - math.exp(-dist_to_reward / 50)  # 50 is a scaling factor
-            fitness -= 5000 * distance_factor  # 5000 is max penalty
-
-        # elif agent.carrying_reward and not agent.returned_home:
-        #     # Similar exponential penalty for distance to home, but with different scaling
-        #     dist_to_home = distance((agent.x, agent.y), beehive_pos)
-        #     distance_factor = 1 - math.exp(-dist_to_home / 50)
-        #     fitness -= 1000 * distance_factor  # Lower max penalty for returning home
+            fitness -= dist_to_reward * 2
+        if agent.carrying_reward and not agent.returned_home:
+            dist_to_home = distance((agent.x, agent.y), beehive_pos)
+            fitness -= dist_to_home
             
         # Minimum fitness to encourage any movement
         fitness = max(fitness, -500)  # Prevent extremely negative fitness values

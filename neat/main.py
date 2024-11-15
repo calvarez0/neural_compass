@@ -1,3 +1,5 @@
+# neat/main.py
+
 import os
 import neat
 import math
@@ -111,7 +113,7 @@ def eval_genome(genome, config):
             fitness -= dist_to_reward * 3
         if agent.carrying_reward and not agent.returned_home:
             dist_to_home = distance((agent.x, agent.y), beehive_pos)
-            fitness -= dist_to_home * 40  # just changed from 4 to 40
+            fitness -= dist_to_home * 4
             
         total_fitness += fitness
     
@@ -155,18 +157,18 @@ def run_neat_with_visualization(checkpoint_frequency=50):
                                                          generation)
                 pop.species.speciate(config, pop.population, generation)
         
+        net = neat.nn.FeedForwardNetwork.create(best_genome, config)
         # Plot the topology of the champion every 100 generations
         if generation % 50 == 0:
             print(f"Plotting champion topology at generation {generation}")
             visualize_network_topology(best_genome, config, generation)
-            save_agent_simulation(neat.nn.FeedForwardNetwork.create(best_genome, config), config, generation)
+            save_agent_simulation(net, config, generation)
+            visualize_agent(net, config, max_steps=1000)
 
         # Visualize current best
         print(f"\nGeneration {generation}")
         print(f"Best Fitness: {best_fitness:.2f}")
         
-        net = neat.nn.FeedForwardNetwork.create(best_genome, config)
-        visualize_agent(net, config, max_steps=1000)
         
         response = input("\nContinue training? (y/n): ").lower().strip()
         if response != 'y':
