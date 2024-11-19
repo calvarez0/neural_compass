@@ -1,4 +1,4 @@
-# neat100/main.py
+# neat50/main.py
 
 import os
 import neat
@@ -12,8 +12,7 @@ from matplotlib.animation import FuncAnimation
 from utilities import *
 from constants import *
 from agent import *
-
-
+    
 def eval_genomes(genomes, config):
     """
     Evaluate a list of genomes.
@@ -23,140 +22,102 @@ def eval_genomes(genomes, config):
 
 
 def randomize_reward_position(width, height, reward_size, min_distance=50, max_distance=150):
+    """Generate reward position within valid distance range from center."""
     center_x, center_y = width // 2, height // 2
 
     while True:
         reward_x = random.randint(reward_size, width - reward_size)
         reward_y = random.randint(reward_size, height - reward_size)
         
-        # Calculate the distance from the center
         distance_from_center = math.sqrt((reward_x - center_x) ** 2 + (reward_y - center_y) ** 2)
         
-        # Check if the distance is within the desired range
         if min_distance <= distance_from_center <= max_distance:
             return (reward_x, reward_y)
 
 
 def eval_genome(genome, config):
-    net = create_network_with_monitoring(genome, config)
-    num_trials = 3  # how many times we're testing each genome
+    net = neat.nn.FeedForwardNetwork.create(genome, config)
+    num_trials = 3
     total_fitness = 0
     
     for _ in range(num_trials):
-        beehive_pos = (WIDTH / 2, HEIGHT / 2)
+        beehive_pos = (WIDTH/2, HEIGHT/2)
         agent = Agent(beehive_pos)
         
-        # Get reward position directly
-        reward_pos = randomize_reward_position(WIDTH, HEIGHT, REWARD_SIZE, 50, 150)                        
-        
+        # Get reward position directly using improved function
+        reward_pos = randomize_reward_position(WIDTH, HEIGHT, REWARD_SIZE, 50, 150)
+                        
         total_distance = 0
         last_pos = (agent.x, agent.y)
         movement_history = []
-        steps_without_progress = 0
-        max_steps = 1000  # Limit the number of steps per trial
+        last_angles = []
+        max_steps = 1000  # Limit steps per trial
         
         for _ in range(max_steps):
             inputs = agent.get_sensor_data(reward_pos)
             outputs = net.activate(inputs)
-            
-            # Scale rotation and movement
-            rotate = outputs[0] * ROTATION_SPEED  # Scale rotation by ROTATION_SPEED
-            move = outputs[1]  # Allow partial movement speeds
-            
-            done = agent.update([rotate, move], reward_pos)
+            done = agent.update(outputs, reward_pos)
             
             # Calculate movement metrics
             current_pos = (agent.x, agent.y)
             dist_moved = distance(last_pos, current_pos)
             total_distance += dist_moved
             
-            # Detect if agent is stuck
-            if dist_moved < 0.1:  # If barely moving
-                steps_without_progress += 1
-            else:
-                steps_without_progress = 0
-                
-            if steps_without_progress > 50:  # If stuck for too long
-                agent.energy -= 1000  # Additional penalty for getting stuck
-                break
-                
-            # Track movement history for diversity
+            # Track rotation history
+            last_angles.append(agent.angle)
+            if len(last_angles) > 10:
+                last_angles.pop(0)
+                        
+            # Track movement history and penalize small area coverage
             movement_history.append((agent.x, agent.y))
             if len(movement_history) > 20:
                 movement_history.pop(0)
-                
-                # Check if moving in too small an area
                 if len(movement_history) >= 3:
                     xs = [p[0] for p in movement_history]
                     ys = [p[1] for p in movement_history]
                     area = (max(xs) - min(xs)) * (max(ys) - min(ys))
                     if area < 2:
-                        agent.energy -= 250  # Penalty for moving in circles
+                        agent.energy -= 200  # Penalty for moving in circles
             
             last_pos = current_pos
             
-            if agent.energy <= 0 or done:
+            if done or agent.energy <= 0:
                 break
         
-        # Calculate fitness
+        # Calculate fitness with balanced rewards and penalties
         fitness = 0
         
-        # Reward for moving at all
-        # fitness += total_distance * 2  # Base reward for movement
-        
-        # Base rewards
+        # Progressive achievement rewards
         if agent.found_reward:
-            fitness += 1000  # Increased from 500
+            fitness += 5000
         if agent.carrying_reward:
-            fitness += 20000  # Increased from 10000
+            fitness += 10000
         if agent.returned_home:
-            fitness *= 2
+            fitness *= 5  # Multiplier for completing the task
+            
+            # Bonus for efficient path
             optimal_path_length = distance(agent.start_position, reward_pos) + distance(reward_pos, beehive_pos)
             if total_distance < optimal_path_length * 1.25:
-                fitness *= 1000
-
-        # instead of cumulative, multiply them at the end (For behaviors that are necessary)
-        # if you're multiplying everything should be multiplied
-        # normalize to (0.01, 1.0)
-
-        # if it never picked up food, distance to food is distance factor
-        # if it picked up pollen, distance to hive should be distance factor
+                fitness *= 1000  # Significant bonus for efficient paths
         
-        #    B         x   P
-
-        # if carrying pollen, no penalty
-        # if not, distance penalty is to pollen only
-
-        # then find some way for beehive distance
-
         # Energy efficiency bonus
         fitness += agent.energy
         
-        # Non-linear distance penalties
+        # Distance-based penalties
         if not agent.found_reward:
-            # Exponentially decreasing penalty for distance to reward
-            # As distance approaches 0, penalty becomes very small
-            # Base penalty is higher when far away
             dist_to_reward = distance((agent.x, agent.y), reward_pos)
-            distance_factor = 1 - math.exp(-dist_to_reward / 50)  # 50 is a scaling factor
-            fitness -= 5000 * distance_factor  # 5000 is max penalty
-
-        # elif agent.carrying_reward and not agent.returned_home:
-        #     # Similar exponential penalty for distance to home, but with different scaling
-        #     dist_to_home = distance((agent.x, agent.y), beehive_pos)
-        #     distance_factor = 1 - math.exp(-dist_to_home / 50)
-        #     fitness -= 1000 * distance_factor  # Lower max penalty for returning home
-            
-        # Minimum fitness to encourage any movement
-        fitness = max(fitness, -500)  # Prevent extremely negative fitness values
+            fitness -= dist_to_reward * 3
+        elif agent.carrying_reward and not agent.returned_home:
+            dist_to_home = distance((agent.x, agent.y), beehive_pos)
+            fitness -= dist_to_home * 4  # Higher penalty for not returning when carrying
             
         total_fitness += fitness
     
     return total_fitness / num_trials
 
+
 def run_neat_with_visualization(checkpoint_frequency=50, continue_frequency=500):
-    """Run NEAT with periodic visualization of the best agent"""
-    # Create run directory at the start
+    """Run NEAT with periodic visualization and improved organization."""
     run_dir = create_run_directory()
     
     local_dir = os.path.dirname(__file__)
@@ -167,7 +128,7 @@ def run_neat_with_visualization(checkpoint_frequency=50, continue_frequency=500)
     
     pop = neat.Population(config)
     
-    # Create and add reporters
+    # Setup statistics and reporting
     stats = neat.StatisticsReporter()
     pop.add_reporter(stats)
     pop.add_reporter(neat.StdOutReporter(False))
@@ -179,8 +140,6 @@ def run_neat_with_visualization(checkpoint_frequency=50, continue_frequency=500)
     # Initialize statistics for generation 0
     genomes = list(pop.population.items())
     eval_genomes(genomes, config)
-    
-    # Explicitly compile stats for initial population
     stats.post_evaluate(config, pop, pop.species, pop.population)
     
     # Find best of initial population
@@ -191,61 +150,64 @@ def run_neat_with_visualization(checkpoint_frequency=50, continue_frequency=500)
             save_genome(best_genome, config, generation, run_dir)
     
     while generation < 5000:
-        # Run evolution for checkpoint_frequency generations
         for _ in range(checkpoint_frequency):
             generation += 1
             
-            # Advance to the next generation
+            # Advance to next generation
             pop.population = pop.reproduction.reproduce(config, pop.species,
                                                      pop.config.pop_size,
                                                      generation)
-            
-            # Update species
             pop.species.speciate(config, pop.population, generation)
             
             # Evaluate all genomes
             genomes = list(pop.population.items())
             eval_genomes(genomes, config)
             
-            # Explicitly compile statistics after evaluation
+            # Update statistics
             stats.post_evaluate(config, pop, pop.species, pop.population)
             
-            # Update best genome
+            # Track best genome
             for _, g in genomes:
                 if g.fitness > best_fitness:
                     best_fitness = g.fitness
                     best_genome = g
                     save_genome(best_genome, config, generation, run_dir)
         
-        # Plot visualizations every checkpoint_frequency generations
+        # Visualization at checkpoints
         if generation % checkpoint_frequency == 0:
             print(f"\nGeneration {generation}")
             print(f"Best Fitness: {best_fitness:.2f}")
             print(f"Number of species: {len(pop.species.species)}")
             print(f"Population size: {len(pop.population)}")
             
-            # Verify statistics data before plotting
+            # Find current generation's best genome
+            current_best = None
+            current_best_fitness = -float('inf')
+            for _, g in genomes:
+                if g.fitness > current_best_fitness:
+                    current_best_fitness = g.fitness
+                    current_best = g
+            
+            # Save the current generation's best genome
+            save_genome(current_best, config, generation, run_dir, 
+                    filename=f'champion_genome_gen{generation}.pkl')
+            
+            # Save the all-time best genome with a special name
+            if current_best_fitness > best_fitness:
+                save_genome(current_best, config, generation, run_dir,
+                        filename='best_ever_genome.pkl')
+            
+            # Generate visualizations
             if stats.get_fitness_mean():
-                try:
-                    # Plot statistics
-                    plot_stats(stats, run_dir, filename=f'fitness_gen{generation}.svg')
+                plot_stats(stats, run_dir, filename=f'fitness_gen{generation}.svg')
+                species_stats = stats.get_species_sizes()
+                if species_stats:
+                    plot_species(stats, run_dir, filename=f'speciation_gen{generation}.svg')
                     
-                    # Plot species if data is available
-                    species_stats = stats.get_species_sizes()
-                    if species_stats and len(species_stats) > 0:
-                        plot_species(stats, run_dir, filename=f'speciation_gen{generation}.svg')
-                except Exception as e:
-                    print(f"Error plotting statistics: {str(e)}")
-            else:
-                print("Warning: Statistics data incomplete - skipping plots")
+            visualize_network_topology(current_best, config, generation, run_dir)
+            save_agent_simulation(current_best, config, generation, run_dir)
             
-            # Save network topology
-            visualize_network_topology(best_genome, config, generation, run_dir)
-            
-            # Save simulation
-            save_agent_simulation(best_genome, config, generation, run_dir)
-            
-            # Only ask to continue every continue_frequency generations
+            # Ask to continue at specified intervals
             if generation % continue_frequency == 0:
                 response = input("\nContinue training? (y/n): ").lower().strip()
                 if response != 'y':
@@ -254,12 +216,10 @@ def run_neat_with_visualization(checkpoint_frequency=50, continue_frequency=500)
     return best_genome, config, run_dir
 
 def main():
-    # Run NEAT with periodic visualization
     winner, config, run_dir = run_neat_with_visualization(checkpoint_frequency=50, continue_frequency=500)
     
-    # Final visualization of the best agent
     print("\nFinal visualization of best agent:")
-    visualize_agent(winner, config)  # Just pass genome and config directly
+    visualize_agent(winner, config)
 
 if __name__ == '__main__':
     main()
