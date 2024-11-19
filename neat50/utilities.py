@@ -793,14 +793,19 @@ def create_run_directory():
 
 def save_config_files(run_dir):
     """
-    Saves copies of main.py and config-neat to the config subdirectory.
+    Saves copies of all core files to the config subdirectory.
     """
     config_dir = os.path.join(run_dir, 'config')
     
-    # Save main.py
-    if os.path.exists('main.py'):
-        shutil.copy2('main.py', os.path.join(config_dir, 'main.txt'))
+    # List of files to save
+    files_to_save = {
+        'main.py': 'main.txt',
+        'config-neat': 'config-neat.txt',
+        'agent.py': 'agent.txt',
+        'utilities.py': 'utilities.txt',
+        'constants.py': 'constants.txt'
+    }
     
-    # Save config-neat
-    if os.path.exists('config-neat'):
-        shutil.copy2('config-neat', os.path.join(config_dir, 'config-neat.txt'))
+    for source, dest in files_to_save.items():
+        if os.path.exists(source):
+            shutil.copy2(source, os.path.join(config_dir, dest))
