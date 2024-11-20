@@ -1,0 +1,866 @@
+import os
+import neat
+import math
+import graphviz
+import random
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.animation import FuncAnimation
+from constants import *
+from agent import *
+from matplotlib import animation
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.patches import Circle, ConnectionPatch, FancyArrowPatch
+from matplotlib.colors import LinearSegmentedColormap
+import colorsys
+import warnings
+import pickle
+from neat.genome import DefaultGenome
+import shutil
+from datetime import datetime
+
+class CompassVisualization:
+    def __init__(self):
+        self.fig = plt.figure(figsize=(8, 8))
+        self.ax = self.fig.add_subplot(111, projection='polar')
+        self.ax.set_title('Neural Compass Activity')
+        
+        # Initialize circular buffer for each direction
+        self.direction_buffer_size = 50
+        self.directions = {
+            'N': {'angle': 90, 'values': []},
+            'NE': {'angle': 45, 'values': []},
+            'E': {'angle': 0, 'values': []},
+            'SE': {'angle': 315, 'values': []},
+            'S': {'angle': 270, 'values': []},
+            'SW': {'angle': 225, 'values': []},
+            'W': {'angle': 180, 'values': []},
+            'NW': {'angle': 135, 'values': []}
+        }
+        
+        plt.tight_layout()
+
+    def update(self, activations):
+        """Update compass visualization with new activation values"""
+        self.ax.clear()
+        
+        # Find nodes that show direction-like behavior
+        for node_id, activation in activations.items():
+            # Add activation to each direction's buffer
+            for direction in self.directions.values():
+                direction['values'].append(abs(activation))
+                if len(direction['values']) > self.direction_buffer_size:
+                    direction['values'].pop(0)
+        
+        # Plot direction strengths
+        angles = np.array([np.radians(d['angle']) for d in self.directions.values()])
+        values = np.array([np.mean(d['values']) if d['values'] else 0 
+                          for d in self.directions.values()])
+        
+        self.ax.plot(angles, values)
+        self.ax.fill(angles, values, alpha=0.25)
+        
+        # Add cardinal direction labels
+        for name, data in self.directions.items():
+            angle = np.radians(data['angle'])
+            self.ax.text(angle, 1.1, name, 
+                        ha='center', va='center')
+        
+        self.fig.canvas.draw()
+        plt.pause(0.01)
+
+class ActivationMonitor:
+    def __init__(self, genome, config):
+        """
+        Initialize the activation monitor.
+        
+        Args:
+            genome: NEAT genome
+            config: NEAT configuration
+        """
+        self.fig, self.ax = plt.subplots(figsize=(8, 4))
+        self.genome = genome
+        self.config = config
+        
+        # Get hidden nodes
+        self.hidden_nodes = sorted(list(
+            set(genome.nodes.keys()) - 
+            set(config.genome_config.input_keys) - 
+            set(config.genome_config.output_keys)
+        ))
+        
+        # Initialize bars
+        self.num_nodes = len(self.hidden_nodes)
+        self.bars = self.ax.bar(range(self.num_nodes), [0] * self.num_nodes)
+        
+        # Setup plot
+        self.ax.set_ylim(-1, 1)
+        self.ax.set_xlim(-0.5, self.num_nodes - 0.5)
+        self.ax.set_xlabel('Hidden Node ID')
+        self.ax.set_ylabel('Activation')
+        self.ax.set_title('Hidden Node Activations')
+        
+        # Add node ID labels
+        plt.xticks(range(self.num_nodes), 
+                  [f'Node {n}' for n in self.hidden_nodes], 
+                  rotation=45)
+        
+        # Add horizontal line at y=0
+        self.ax.axhline(y=0, color='k', linestyle='-', alpha=0.3)
+        
+        # Add time window for tracking activation patterns
+        self.time_window = 50  # Store last 50 activations
+        self.activation_history = {node: [] for node in self.hidden_nodes}
+        
+        # Create a second subplot for temporal patterns
+        self.fig2, self.ax2 = plt.subplots(figsize=(8, 4))
+        self.lines = {}
+        for node in self.hidden_nodes:
+            line, = self.ax2.plot([], [], label=f'Node {node}')
+            self.lines[node] = line
+        
+        self.ax2.set_xlim(0, self.time_window)
+        self.ax2.set_ylim(-1, 1)
+        self.ax2.set_title('Activation Patterns Over Time')
+        self.ax2.set_xlabel('Time Steps')
+        self.ax2.set_ylabel('Activation')
+        self.ax2.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        self.fig2.tight_layout()
+
+        # Add compass visualization
+        self.compass_vis = CompassVisualization()
+
+    def update_activations(self, activations):
+        """Update the bar plot with new activation values."""
+        # Update bars
+        for idx, node_id in enumerate(self.hidden_nodes):
+            if node_id in activations:
+                self.bars[idx].set_height(activations[node_id])
+                
+                # Update activation history
+                self.activation_history[node_id].append(activations[node_id])
+                if len(self.activation_history[node_id]) > self.time_window:
+                    self.activation_history[node_id].pop(0)
+        
+        # Update temporal pattern plot
+        for node_id, line in self.lines.items():
+            history = self.activation_history[node_id]
+            line.set_data(range(len(history)), history)
+        
+        # Draw both figures
+        self.fig.canvas.draw()
+        self.fig2.canvas.draw()
+        
+        # Update compass visualization
+        self.compass_vis.update(activations)
+        
+        # Pause to allow for visualization
+        # plt.pause(0.01)
+
+class ModifiedFeedForwardNetwork(neat.nn.FeedForwardNetwork):
+    """Modified NEAT network that exposes node activations."""
+    @classmethod
+    def create(cls, genome, config):
+        """Create a new FeedForwardNetwork."""
+        net = super().create(genome, config)
+        # Convert the created network to our modified class
+        net.__class__ = cls
+        return net
+    
+    def activate(self, inputs):
+        """Get network output and save node activations."""
+        if len(self.input_nodes) != len(inputs):
+            raise RuntimeError(f"Expected {len(self.input_nodes)} inputs, got {len(inputs)}")
+
+        for i, v in zip(self.input_nodes, inputs):
+            self.values[i] = v
+
+        for node, act_func, agg_func, bias, response, links in self.node_evals:
+            node_inputs = []
+            for i, w in links:
+                node_inputs.append(self.values[i] * w)
+            s = agg_func(node_inputs)
+            self.values[node] = act_func(bias + response * s)
+
+        # Store hidden node activations
+        self.hidden_activations = {
+            node: self.values[node] 
+            for node, _, _, _, _, _ in self.node_evals 
+            if node not in self.output_nodes and node not in self.input_nodes
+        }
+
+        return [self.values[i] for i in self.output_nodes]
+    
+def create_network_with_monitoring(genome, config):
+    """Create a network with activation monitoring capabilities."""
+    return ModifiedFeedForwardNetwork.create(genome, config)
+
+def visualize_network_topology(genome, config, generation, run_dir, view=False, filename=None):
+    """Visualizes the topology of a NEAT neural network using graphviz."""
+    if filename is None:
+        filename = f'champion_topology_gen{generation}'
+    
+    filepath = os.path.join(run_dir, 'visualizations', filename)
+
+    if graphviz is None:
+        warnings.warn("This display is not available due to a missing optional dependency (graphviz)")
+        return
+                
+    # Define node attributes
+    node_attrs = {
+        'shape': 'circle',
+        'fontsize': '9',
+        'height': '0.2',
+        'width': '0.2'
+    }
+    
+    # Create new digraph
+    dot = graphviz.Digraph(format='png', node_attr=node_attrs)
+    dot.attr(rankdir='LR')  # Left to right layout
+    
+    # Create input nodes
+    with dot.subgraph(name='cluster_input') as input_sg:
+        input_sg.attr(color='lightgrey', style='filled')
+        input_sg.attr(label='Input Layer')
+        for k in config.genome_config.input_keys:
+            input_sg.node(str(k), 
+                         _attributes={'style': 'filled', 
+                                    'shape': 'box',
+                                    'fillcolor': 'lightblue'})
+    
+    # Create output nodes
+    with dot.subgraph(name='cluster_output') as output_sg:
+        output_sg.attr(color='lightgrey', style='filled')
+        output_sg.attr(label='Output Layer')
+        for k in config.genome_config.output_keys:
+            output_sg.node(str(k), 
+                          _attributes={'style': 'filled',
+                                     'shape': 'box',
+                                     'fillcolor': 'lightgreen'})
+    
+    # Create hidden nodes
+    hidden_nodes = set(genome.nodes.keys()) - \
+                  set(config.genome_config.input_keys) - \
+                  set(config.genome_config.output_keys)
+                  
+    for n in hidden_nodes:
+        dot.node(str(n), 
+                _attributes={'style': 'filled',
+                           'fillcolor': 'white'})
+    
+    # Add connections
+    for conn_gene in genome.connections.values():
+        if conn_gene.enabled:
+            input_node, output_node = conn_gene.key
+            # Determine connection properties based on weight
+            color = 'green' if conn_gene.weight > 0 else 'red'
+            width = str(0.1 + abs(conn_gene.weight / 5.0))
+            dot.edge(str(input_node), str(output_node),
+                    _attributes={'style': 'solid',
+                               'color': color,
+                               'penwidth': width})
+        else:
+            # Show disabled connections as dotted lines
+            input_node, output_node = conn_gene.key
+            dot.edge(str(input_node), str(output_node),
+                    _attributes={'style': 'dotted',
+                               'color': 'grey'})
+    
+    # Add title
+    dot.attr(label=f'Network Topology - Generation {generation}')
+    dot.attr(fontsize='16')
+    
+    # Save the visualization
+    dot.render(filepath, view=view, cleanup=True)
+    print(f"Network topology saved as '{filepath}.png'")
+
+def plot_stats(statistics, run_dir, ylog=False, view=False, filename='avg_fitness.svg'):
+    """Plots the population's average and best fitness."""
+    filepath = os.path.join(run_dir, 'stats', filename)
+    
+    if plt is None:
+        warnings.warn("This display is not available due to a missing optional dependency (matplotlib)")
+        return
+    
+    # Get available data
+    generation = range(len(statistics.most_fit_genomes))
+    best_fitness = [c.fitness for c in statistics.most_fit_genomes if hasattr(c, 'fitness')]
+    mean_fitness = statistics.get_fitness_mean()
+    stdev_fitness = statistics.get_fitness_stdev()
+    
+    # Verify we have at least some data to plot
+    if not best_fitness:
+        print("No best fitness data available")
+        return
+        
+    plt.figure(figsize=(10, 6))
+    
+    # Plot available data
+    plt.plot(generation, best_fitness, 'r-', label="best", linewidth=2)
+    
+    if mean_fitness:
+        mean_fitness = np.array(mean_fitness)
+        plt.plot(generation, mean_fitness, 'b-', label="average", linewidth=1.5)
+        
+        if stdev_fitness:
+            stdev_fitness = np.array(stdev_fitness)
+            plt.fill_between(generation,
+                           mean_fitness - stdev_fitness,
+                           mean_fitness + stdev_fitness,
+                           alpha=0.2, color='blue', label="±1 std")
+    
+    plt.title("Population's average and best fitness")
+    plt.xlabel("Generations")
+    plt.ylabel("Fitness")
+    plt.grid(True, alpha=0.3)
+    plt.legend(loc="best")
+    if ylog:
+        plt.gca().set_yscale('symlog')
+    
+    try:
+        plt.savefig(filepath)
+        print(f"Statistics plot saved as '{filepath}'")
+    except Exception as e:
+        print(f"Error saving plot: {str(e)}")
+        
+    if view:
+        plt.show()
+    plt.close()
+
+def plot_species(statistics, run_dir, view=False, filename='speciation.svg'):
+    """Visualizes speciation throughout evolution."""
+    filepath = os.path.join(run_dir, 'stats', filename)
+    
+    if plt is None:
+        warnings.warn("This display is not available due to a missing optional dependency (matplotlib)")
+        return
+
+    try:
+        species_sizes = statistics.get_species_sizes()
+        if not species_sizes:  # Check if the list is empty
+            print("No species data available yet")
+            return
+            
+        num_generations = len(species_sizes)
+        curves = np.array(species_sizes).T
+
+        fig, ax = plt.subplots()
+        ax.stackplot(range(num_generations), *curves)
+
+        plt.title("Speciation")
+        plt.ylabel("Size per Species")
+        plt.xlabel("Generations")
+
+        plt.savefig(filepath)
+
+        if view:
+            plt.show()
+
+        plt.close()
+        
+    except (ValueError, AttributeError) as e:
+        print(f"Unable to plot species data: {e}")
+        return
+
+def sort_hidden_layers(genome, hidden_nodes, num_inputs, positions):
+    """Sort hidden nodes into layers based on their connectivity."""
+    layers = []
+    remaining_nodes = set(hidden_nodes)
+    
+    # Include bias nodes and input nodes in the input set
+    input_nodes = set(k for k in positions.keys() if k < num_inputs)
+    
+    while remaining_nodes:
+        current_layer = set()
+        for node in remaining_nodes:
+            input_connections = set()
+            for conn in genome.connections.values():
+                if conn.enabled and conn.key[1] == node:
+                    input_connections.add(conn.key[0])
+            
+            # Check if all inputs to this node are from previous layers or inputs
+            if input_connections and input_connections.issubset(input_nodes):
+                current_layer.add(node)
+        
+        if not current_layer:
+            # If no nodes found, put remaining nodes in one layer
+            layers.append(sorted(list(remaining_nodes)))
+            break
+            
+        layers.append(sorted(list(current_layer)))
+        remaining_nodes -= current_layer
+        input_nodes.update(current_layer)
+    
+    return layers
+
+def draw_connections(ax, genome, positions, max_weight, cmap):
+    """Draw neural network connections with weight-based styling."""
+    # Sort connections by weight for proper layering
+    connections = sorted(
+        genome.connections.values(),
+        key=lambda x: abs(x.weight)
+    )
+    
+    for conn_gene in connections:
+        if conn_gene.enabled:
+            if conn_gene.key[0] not in positions or conn_gene.key[1] not in positions:
+                continue
+                
+            start = positions[conn_gene.key[0]]
+            end = positions[conn_gene.key[1]]
+            
+            # Normalize weight for color mapping
+            weight_normalized = (conn_gene.weight + max_weight) / (2 * max_weight)
+            color = cmap(weight_normalized)
+            
+            # Calculate arrow properties based on weight
+            width = 1 + 2 * abs(conn_gene.weight) / max_weight
+            
+            # Adjust curvature based on node positions
+            rad = 0.2
+            if abs(start[0] - end[0]) < 0.1:  # Nearly vertical connections
+                rad = 0.4
+            
+            # Create curved arrow
+            arrow = FancyArrowPatch(
+                start, end,
+                arrowstyle='-|>',
+                connectionstyle=f'arc3,rad={rad}',
+                mutation_scale=10,
+                linewidth=width,
+                color=color,
+                alpha=0.6,
+                zorder=1
+            )
+            ax.add_patch(arrow)
+            
+            # Add weight label with improved positioning
+            mid_point = (start + end) / 2
+            offset = np.array([0.02, 0.02])
+            plt.annotate(
+                f'{conn_gene.weight:.2f}',
+                xy=mid_point,
+                xytext=mid_point + offset,
+                fontsize=6,
+                alpha=0.7,
+                zorder=3
+            )
+
+def draw_nodes(ax, genome, positions, num_inputs, num_outputs):
+    """Draw neural network nodes with labels."""
+    node_labels = {}
+
+    for node_id, pos in positions.items():
+        if node_id < 0:
+            color = '#FFB6C1'
+            size = 0.03
+            label = f'Bias {node_id}'
+        elif node_id < num_inputs:
+            color = '#AED6F1'
+            size = 0.03
+            label = f'In {node_id}'
+        elif node_id < num_inputs + num_outputs:
+            color = '#A2D9A2'
+            size = 0.03
+            label = f'Out {node_id}'
+        else:
+            color = '#F5CBA7'
+            size = 0.025
+            label = f'H {node_id}'
+
+        circle = Circle(
+            pos,
+            size,
+            facecolor=color,
+            edgecolor='gray',
+            linewidth=1,
+            alpha=0.8,
+            zorder=2
+        )
+        ax.add_patch(circle)
+        plt.annotate(
+            label,
+            xy=pos,
+            xytext=(pos[0], pos[1] - 0.02),
+            ha='center',
+            va='top',
+            fontsize=8
+        )
+        node_labels[node_id] = label
+
+    return node_labels
+
+def add_annotations(ax, generation, node_labels):
+    """Add title and other annotations to the visualization."""
+    plt.title(f'Champion Network Topology - Generation {generation}', 
+              pad=20, size=14, weight='bold')
+
+    legend_elements = [
+        Circle((0, 0), 0.02, facecolor='#FFB6C1', label='Bias'),
+        Circle((0, 0), 0.02, facecolor='#AED6F1', label='Input'),
+        Circle((0, 0), 0.02, facecolor='#A2D9A2', label='Output'),
+        Circle((0, 0), 0.02, facecolor='#F5CBA7', label='Hidden')
+    ]
+    ax.legend(handles=legend_elements, 
+             loc='center left', 
+             bbox_to_anchor=(1, 0.5))
+
+    ax.set_xlim(-0.1, 1.1)
+    ax.set_ylim(-0.1, 1.1)
+    ax.axis('off')
+
+def visualize_agent(genome, config, max_steps=None):
+    """
+    Visualize agent behavior with neural network activation monitoring
+    """
+    # Create network with activation monitoring
+    net = create_network_with_monitoring(genome, config)
+    monitor = ActivationMonitor(genome, config)
+    
+    class AnimationState:
+        def __init__(self):
+            self.running = True
+            self.steps = 0
+            self.beehive_pos = (WIDTH/2, HEIGHT/2)
+            self.agent = Agent(self.beehive_pos)
+            
+            while True:
+                self.reward_pos = (
+                    random.randint(REWARD_SIZE, WIDTH - REWARD_SIZE),
+                    random.randint(REWARD_SIZE, HEIGHT - REWARD_SIZE)
+                )
+                dist_to_home = distance(self.beehive_pos, self.reward_pos)
+                if 50 <= dist_to_home <= 150:
+                    break
+
+    state = AnimationState()
+    fig, ax = plt.subplots(figsize=(10, 10))
+    
+    def on_close(event):
+        state.running = False
+    
+    fig.canvas.mpl_connect('close_event', on_close)
+    
+    def update():
+        if not state.running or (max_steps and state.steps >= max_steps):
+            return False
+        
+        state.steps += 1
+        ax.clear()
+        ax.set_xlim(0, WIDTH)
+        ax.set_ylim(0, HEIGHT)
+        
+        # Get neural network output and update agent
+        inputs = state.agent.get_sensor_data(state.reward_pos)
+        outputs = net.activate(inputs)
+        done = state.agent.update(outputs, state.reward_pos)
+        
+        # Update activation monitor
+        monitor.update_activations(net.hidden_activations)
+        
+        # Draw path
+        if len(state.agent.path_positions) > 1:
+            path_x = [p[0] for p in state.agent.path_positions]
+            path_y = [p[1] for p in state.agent.path_positions]
+            ax.plot(path_x, path_y, 'b-', alpha=0.5)
+        
+        # Draw vision cone
+        if state.agent.vision_active:
+            end_x = state.agent.x + VISION_RANGE * math.cos(math.radians(state.agent.angle))
+            end_y = state.agent.y + VISION_RANGE * math.sin(math.radians(state.agent.angle))
+            ax.plot([state.agent.x, end_x], [state.agent.y, end_y], 'g-', alpha=0.3)
+        
+        # Draw agent
+        agent_circle = patches.Circle(
+            (state.agent.x, state.agent.y),
+            AGENT_SIZE,
+            color='red' if state.agent.carrying_reward else 'green'
+        )
+        ax.add_patch(agent_circle)
+        
+        # Draw direction indicator
+        end_x = state.agent.x + AGENT_SIZE * 2 * math.cos(math.radians(state.agent.angle))
+        end_y = state.agent.y + AGENT_SIZE * 2 * math.sin(math.radians(state.agent.angle))
+        ax.plot([state.agent.x, end_x], [state.agent.y, end_y], 'k-', linewidth=2)
+        
+        # Draw beehive and reward
+        beehive_rect = patches.Rectangle(
+            (state.beehive_pos[0] - BEEHIVE_SIZE//2, state.beehive_pos[1] - BEEHIVE_SIZE//2),
+            BEEHIVE_SIZE, BEEHIVE_SIZE, color='brown'
+        )
+        ax.add_patch(beehive_rect)
+        
+        reward_circle = patches.Circle(
+            (state.reward_pos[0], state.reward_pos[1]),
+            REWARD_SIZE,
+            color='red'
+        )
+        ax.add_patch(reward_circle)
+        
+        # Add status text
+        status_text = [
+            f"Steps: {state.agent.steps_taken}",
+            f"Vision: {'ON' if state.agent.vision_active else 'OFF'}",
+            f"Carrying Reward: {'YES' if state.agent.carrying_reward else 'NO'}",
+            f"Energy: {state.agent.energy}",
+        ]
+        
+        current_target = state.beehive_pos if state.agent.carrying_reward else state.reward_pos
+        target_dist = distance((state.agent.x, state.agent.y), current_target)
+        status_text.append(f"Distance to {'Home' if state.agent.carrying_reward else 'Reward'}: {target_dist:.1f}")
+        
+        for i, text in enumerate(status_text):
+            ax.text(5, HEIGHT - 5 - (i * 15), text,
+                   verticalalignment='top',
+                   bbox=dict(facecolor='white', alpha=0.7))
+        
+        if done:
+            return False
+        
+        ax.set_aspect('equal')
+        plt.draw()
+        return True
+    
+    while plt.fignum_exists(fig.number):
+        if not update():
+            break
+        plt.pause(0.05)
+    
+    plt.close()
+
+def save_agent_simulation(genome, config, generation, run_dir, max_steps=500, filename=None):
+    """Save agent simulation as MP4 video."""
+    if filename is None:
+        filename = f'agent_simulation_gen{generation}.mp4'
+    
+    filepath = os.path.join(run_dir, 'videos', filename)
+    
+    # Rest of your existing save_agent_simulation code here, just use filepath instead
+    # Create network with monitoring at the start of the function
+    net = create_network_with_monitoring(genome, config)
+    
+    class SimState:
+        def __init__(self):
+            self.steps = 0
+            self.beehive_pos = (WIDTH/2, HEIGHT/2)
+            self.agent = Agent(self.beehive_pos)
+            
+            while True:
+                self.reward_pos = (
+                    random.randint(REWARD_SIZE, WIDTH - REWARD_SIZE),
+                    random.randint(REWARD_SIZE, HEIGHT - REWARD_SIZE)
+                )
+                dist_to_home = distance(self.beehive_pos, self.reward_pos)
+                if 50 <= dist_to_home <= 150:
+                    break
+
+    state = SimState()
+    fig, ax = plt.subplots(figsize=(10, 10))
+    
+    def animation_frame(frame):
+        if state.steps >= max_steps:
+            return []
+        
+        state.steps += 1
+        ax.clear()
+        ax.set_xlim(0, WIDTH)
+        ax.set_ylim(0, HEIGHT)
+        
+        # Get neural network output and update agent
+        inputs = state.agent.get_sensor_data(state.reward_pos)
+        outputs = net.activate(inputs)
+        done = state.agent.update(outputs, state.reward_pos)
+        
+        artists = []
+        
+        # Draw path
+        if len(state.agent.path_positions) > 1:
+            path_x = [p[0] for p in state.agent.path_positions]
+            path_y = [p[1] for p in state.agent.path_positions]
+            line, = ax.plot(path_x, path_y, 'b-', alpha=0.5)
+            artists.append(line)
+        
+        # Draw vision cone
+        if state.agent.vision_active:
+            end_x = state.agent.x + VISION_RANGE * math.cos(math.radians(state.agent.angle))
+            end_y = state.agent.y + VISION_RANGE * math.sin(math.radians(state.agent.angle))
+            line, = ax.plot([state.agent.x, end_x], [state.agent.y, end_y], 'g-', alpha=0.3)
+            artists.append(line)
+        
+        # Draw agent
+        agent_circle = patches.Circle(
+            (state.agent.x, state.agent.y),
+            AGENT_SIZE,
+            color='red' if state.agent.carrying_reward else 'green'
+        )
+        ax.add_patch(agent_circle)
+        artists.append(agent_circle)
+        
+        # Draw direction indicator
+        end_x = state.agent.x + AGENT_SIZE * 2 * math.cos(math.radians(state.agent.angle))
+        end_y = state.agent.y + AGENT_SIZE * 2 * math.sin(math.radians(state.agent.angle))
+        line, = ax.plot([state.agent.x, end_x], [state.agent.y, end_y], 'k-', linewidth=2)
+        artists.append(line)
+        
+        # Draw beehive and reward
+        beehive_rect = patches.Rectangle(
+            (state.beehive_pos[0] - BEEHIVE_SIZE//2, state.beehive_pos[1] - BEEHIVE_SIZE//2),
+            BEEHIVE_SIZE, BEEHIVE_SIZE, color='brown'
+        )
+        ax.add_patch(beehive_rect)
+        artists.append(beehive_rect)
+        
+        reward_circle = patches.Circle(
+            (state.reward_pos[0], state.reward_pos[1]),
+            REWARD_SIZE,
+            color='red'
+        )
+        ax.add_patch(reward_circle)
+        artists.append(reward_circle)
+        
+        # Add status text
+        status_text = [
+            f"Steps: {state.agent.steps_taken}",
+            f"Vision: {'ON' if state.agent.vision_active else 'OFF'}",
+            f"Carrying Reward: {'YES' if state.agent.carrying_reward else 'NO'}",
+            f"Energy: {state.agent.energy}",
+        ]
+        
+        current_target = state.beehive_pos if state.agent.carrying_reward else state.reward_pos
+        target_dist = distance((state.agent.x, state.agent.y), current_target)
+        status_text.append(f"Distance to {'Home' if state.agent.carrying_reward else 'Reward'}: {target_dist:.1f}")
+        
+        for i, text in enumerate(status_text):
+            text_artist = ax.text(5, HEIGHT - 5 - (i * 15), text,
+                                verticalalignment='top',
+                                bbox=dict(facecolor='white', alpha=0.7))
+            artists.append(text_artist)
+        
+        ax.set_aspect('equal')
+        
+        if done:
+            state.steps = max_steps  # End the animation
+            
+        return artists
+    
+    # Create animation
+    anim = FuncAnimation(fig, animation_frame, frames=max_steps,
+                        interval=50, blit=True)
+    
+    # Save animation
+    writer = animation.FFMpegWriter(fps=20, bitrate=2000)
+    anim.save(filepath, writer=writer)
+    plt.close()
+    print(f"Simulation saved as '{filepath}'")
+
+
+# Saving genome to use later:
+def save_genome(genome, config, generation, run_dir, filename=None):
+    """
+    Save a genome to a file using pickle serialization.
+    
+    Args:
+        genome: The NEAT genome to save
+        config: The NEAT configuration object
+        generation: The current generation number
+        run_dir: The main run directory
+        filename: Optional custom filename, if None will generate based on generation
+    
+    Returns:
+        str: The path to the saved genome file
+    """
+    if filename is None:
+        filename = f'champion_genome_gen{generation}.pkl'
+    
+    filepath = os.path.join(run_dir, 'genomes', filename)
+    
+    # Save both the genome and the configuration
+    data = {
+        'genome': genome,
+        'config': config,
+        'generation': generation
+    }
+    
+    with open(filepath, 'wb') as f:
+        pickle.dump(data, f)
+    
+    print(f"Genome saved to {filepath}")
+    return filepath
+
+def load_genome(filepath: str) -> tuple:
+    """
+    Load a genome from a pickle file.
+    
+    Args:
+        filepath: Path to the saved genome file
+        
+    Returns:
+        tuple: (genome, config, generation)
+    """
+    with open(filepath, 'rb') as f:
+        data = pickle.load(f)
+    
+    return data['genome'], data['config'], data['generation']
+
+def visualize_saved_genome(filepath: str, max_steps: int = 1000):
+    """
+    Load and visualize a saved genome.
+    
+    Args:
+        filepath: Path to the saved genome file
+        max_steps: Maximum number of simulation steps
+    """
+    # Load the saved genome and config
+    genome, config, generation = load_genome(filepath)
+    
+    # Visualize the agent's behavior with genome directly
+    visualize_agent(genome, config, max_steps=max_steps)
+    
+    # Optionally visualize the network topology
+    visualize_network_topology(genome, config, generation)
+
+def create_run_directory():
+    """
+    Creates a new directory structure for the current run using timestamp.
+    Returns the path to the main run directory.
+    """
+    try:
+        # Create timestamp-based directory name
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        run_dir = os.path.join('runs', f'run_{timestamp}')
+        
+        # Create main directory and subdirectories
+        subdirs = ['genomes', 'visualizations', 'videos', 'stats', 'config']
+        os.makedirs(run_dir, exist_ok=True)
+        for subdir in subdirs:
+            os.makedirs(os.path.join(run_dir, subdir), exist_ok=True)
+        
+        # Save initial configuration files
+        save_config_files(run_dir)
+        
+        print(f"Created new run directory: {run_dir}")
+        return run_dir
+    except Exception as e:
+        print(f"Error creating run directory: {e}")
+        raise
+
+def save_config_files(run_dir):
+    """
+    Saves copies of all core files to the config subdirectory.
+    """
+    config_dir = os.path.join(run_dir, 'config')
+    
+    # List of files to save
+    files_to_save = {
+        'main.py': 'main.txt',
+        'config-neat': 'config-neat.txt',
+        'agent.py': 'agent.txt',
+        'utilities.py': 'utilities.txt',
+        'constants.py': 'constants.txt'
+    }
+    
+    for source, dest in files_to_save.items():
+        if os.path.exists(source):
+            shutil.copy2(source, os.path.join(config_dir, dest))

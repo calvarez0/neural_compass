@@ -37,7 +37,7 @@ bias_min_value          = -30.0
 bias_mutate_power       = 0.5
 bias_mutate_rate        = 0.7
 # keeping replace rates 0 for now
-bias_replace_rate       = 0.1
+bias_replace_rate       = 0.0
 
 # connection weight options
 weight_init_mean        = 0.0
@@ -46,7 +46,7 @@ weight_max_value        = 30
 weight_min_value        = -30
 weight_mutate_power     = 0.5
 weight_mutate_rate      = 0.8
-weight_replace_rate     = 0.1
+weight_replace_rate     = 0.0
 
 # node response options
 response_init_mean      = 1.0
@@ -72,21 +72,13 @@ compatibility_weight_coefficient = 0.5
 [DefaultSpeciesSet]
 compatibility_threshold = 2.75
 
-# double or halve each value to test
-
 # elitism of entire species
-# even though we kill a species after 20 generations of stagnation
-# we preserve the top 2
 [DefaultStagnation]
-species_fitness_func = mean
+species_fitness_func = max
 max_stagnation      = 20
 species_elitism     = 2
 
 # elitism of individuals for entire population
-# top 20% of individuals in a species is allowed to reproduce
-# other 80% gets discarded
-# I think the reason we have 300 species at first even though the population size is 150
-# is because min_species_size is 2 so we double need 2 genomes for every species regardless
 [DefaultReproduction]
 elitism            = 2
 survival_threshold = 0.2
