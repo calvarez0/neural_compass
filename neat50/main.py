@@ -213,13 +213,10 @@ def run_neat_with_visualization(checkpoint_frequency=50, continue_frequency=500)
                 if response != 'y':
                     break
     
-    return best_genome, config, run_dir
+    return run_dir
 
 def main():
-    winner, config, run_dir = run_neat_with_visualization(checkpoint_frequency=50, continue_frequency=500)
-    
-    print("\nFinal visualization of best agent:")
-    visualize_agent(winner, config)
+    run_neat_with_visualization(checkpoint_frequency=50, continue_frequency=500)
 
 if __name__ == '__main__':
     main()
