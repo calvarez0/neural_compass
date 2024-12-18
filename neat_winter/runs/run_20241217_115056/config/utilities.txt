@@ -1,5 +1,3 @@
-# neat_winter/utilities.py
-
 import os
 import neat
 import math
@@ -25,7 +23,6 @@ def randomize_reward_position(width, height, reward_size, beehive_pos, min_dista
     """Generate reward position within valid distance range from beehive."""
     beehive_x, beehive_y = beehive_pos
     
-    # random position until it meets criteria (min_distance <= distance_from_beehive <= max_distance)
     while True:
         reward_x = random.randint(reward_size, width - reward_size)
         reward_y = random.randint(reward_size, height - reward_size)
@@ -34,7 +31,6 @@ def randomize_reward_position(width, height, reward_size, beehive_pos, min_dista
         
         if min_distance <= distance_from_beehive <= max_distance:
             return (reward_x, reward_y)
-
 
 def visualize_network_topology(genome, config, generation, run_dir, view=False, filename=None):
     """Visualizes the topology of a NEAT neural network using graphviz."""
@@ -372,17 +368,15 @@ def save_agent_simulation(genome, config, generation, run_dir, filename=None):
             self.steps = 0
             
             # Randomize beehive position with margin
-            margin = 10
+            margin = 1
             self.beehive_pos = (
                 random.uniform(margin, WIDTH - margin),
                 random.uniform(margin, HEIGHT - margin)
             )
             self.agent = Agent(self.beehive_pos)
             
-            # Make sure this is the same as it is in main if you want sims to look the same as how they are
-            # evaluated
             # Use the same randomize_reward_position function as in eval
-            self.reward_pos = randomize_reward_position(WIDTH, HEIGHT, REWARD_SIZE, self.beehive_pos, 45, 125)
+            self.reward_pos = randomize_reward_position(WIDTH, HEIGHT, REWARD_SIZE, self.beehive_pos, 50, 175)
 
     state = SimState()
     fig, ax = plt.subplots(figsize=(10, 10))

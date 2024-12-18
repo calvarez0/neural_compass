@@ -1,7 +1,11 @@
+# neat_winter/test.py
+
 import os
 import neat
 import math
 import numpy as np
+import matplotlib
+matplotlib.use('MacOSX')
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import matplotlib.patches as patches
@@ -165,8 +169,8 @@ def run_simulation(genome_path):
         
         # Draw agent path
         if len(state['agent'].path_positions) > 1:
-            path_x = [p[0] for p in state['agent'].path_positions[-50:]]  # Show last 50 positions
-            path_y = [p[1] for p in state['agent'].path_positions[-50:]]
+            path_x = [p[0] for p in state['agent'].path_positions[-150:]]  # Show last 50 positions
+            path_y = [p[1] for p in state['agent'].path_positions[-150:]]
             ax1.plot(path_x, path_y, 'b-', alpha=0.5)
         
         # Draw agent
@@ -222,10 +226,10 @@ def run_simulation(genome_path):
         return []
     
     # Create animation
-    anim = FuncAnimation(fig, update, interval=50, blit=True)
+    anim = FuncAnimation(fig, update, interval=5, blit=True)
     plt.show()
 
 if __name__ == "__main__":
     # Specify the path to your genome file
-    genome_path = "runs/run_20241122_215413/genomes/champion_genome_gen825.pkl"  # Update this path
+    genome_path = "runs/run_20241218_131646/genomes/champion_genome_gen875.pkl"  # Update this path
     run_simulation(genome_path)

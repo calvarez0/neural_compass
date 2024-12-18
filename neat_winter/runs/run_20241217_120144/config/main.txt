@@ -1,4 +1,4 @@
-# neat_winter/main.py
+# neat50/main.py
 
 import os
 import neat

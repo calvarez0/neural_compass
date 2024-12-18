@@ -1,4 +1,4 @@
-# neat_winter/main.py
+# neat50/main.py
 
 import os
 import neat
@@ -27,7 +27,7 @@ def eval_genome(genome, config):
     total_fitness = 0
     
     for _ in range(num_trials):
-        margin = 10  # adjust this value as needed (margin for beehive)
+        margin = 1  # adjust this value as needed (margin for beehive)
         beehive_pos = (
             random.uniform(margin, WIDTH - margin),
             random.uniform(margin, HEIGHT- margin)

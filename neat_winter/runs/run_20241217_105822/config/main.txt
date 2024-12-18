@@ -1,4 +1,4 @@
-# neat_winter/main.py
+# neat50/main.py
 
 import os
 import neat
@@ -27,13 +27,13 @@ def eval_genome(genome, config):
     total_fitness = 0
     
     for _ in range(num_trials):
-        margin = 10  # adjust this value as needed (margin for beehive)
+        margin = 1  # adjust this value as needed (margin for beehive)
         beehive_pos = (
             random.uniform(margin, WIDTH - margin),
             random.uniform(margin, HEIGHT- margin)
         )
         agent = Agent(beehive_pos)
-        reward_pos = randomize_reward_position(WIDTH, HEIGHT, REWARD_SIZE, beehive_pos, 45, 125)
+        reward_pos = randomize_reward_position(WIDTH, HEIGHT, REWARD_SIZE, beehive_pos, 50, 175)
         
         max_steps = 1000
 
@@ -57,7 +57,6 @@ def eval_genome(genome, config):
             # Calculate optimal path length
             optimal_path = distance(beehive_pos, reward_pos) * 2  # To reward and back
             actual_path = sum(distance(p1, p2) for p1, p2 in zip(agent.path_positions[:-1], agent.path_positions[1:]))
-            minimum_possible_steps = optimal_path / MOVE_SPEED  # Since agent moves MOVE_SPEED units per step
             
             # Base completion reward
             fitness = 1000
@@ -67,11 +66,9 @@ def eval_genome(genome, config):
             efficiency_bonus = 1000 * math.exp(efficiency_ratio - 1)
             fitness += efficiency_bonus
             
-            # Time efficiency bonus that scales based on how close they got to optimal time
-            time_efficiency = minimum_possible_steps / step  # Will be <= 1.0 for realistic completions
-            time_bonus = 1000 * math.exp(time_efficiency - 1)  # Similar scale to previous bonus but relative to optimal
+            # Time bonus that can also grow unbounded
+            time_bonus = 1000 * math.exp((max_steps - step) / 100)
             fitness += time_bonus
-
             
         total_fitness += fitness
     

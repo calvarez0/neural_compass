@@ -1,5 +1,3 @@
-# neat_winter/utilities.py
-
 import os
 import neat
 import math
@@ -21,27 +19,13 @@ from neat.genome import DefaultGenome
 import shutil
 from datetime import datetime
 
-def randomize_reward_position(width, height, reward_size, beehive_pos, min_distance=25, max_distance=125):
-    """Generate reward position within valid distance range from beehive."""
-    beehive_x, beehive_y = beehive_pos
-    
-    # random position until it meets criteria (min_distance <= distance_from_beehive <= max_distance)
-    while True:
-        reward_x = random.randint(reward_size, width - reward_size)
-        reward_y = random.randint(reward_size, height - reward_size)
-        
-        distance_from_beehive = math.sqrt((reward_x - beehive_x) ** 2 + (reward_y - beehive_y) ** 2)
-        
-        if min_distance <= distance_from_beehive <= max_distance:
-            return (reward_x, reward_y)
-
 
 def visualize_network_topology(genome, config, generation, run_dir, view=False, filename=None):
     """Visualizes the topology of a NEAT neural network using graphviz."""
     if filename is None:
         filename = f'champion_topology_gen{generation}'
     
-    filepath = os.path.join(run_dir, 'topologies', filename)
+    filepath = os.path.join(run_dir, 'visualizations', filename)
 
     if graphviz is None:
         warnings.warn("This display is not available due to a missing optional dependency (graphviz)")
@@ -118,7 +102,7 @@ def visualize_network_topology(genome, config, generation, run_dir, view=False, 
 
 def plot_stats(statistics, run_dir, ylog=False, view=False, filename='avg_fitness.svg'):
     """Plots the population's average and best fitness."""
-    filepath = os.path.join(run_dir, 'speciation', filename)
+    filepath = os.path.join(run_dir, 'stats', filename)
     
     if plt is None:
         warnings.warn("This display is not available due to a missing optional dependency (matplotlib)")
@@ -172,7 +156,7 @@ def plot_stats(statistics, run_dir, ylog=False, view=False, filename='avg_fitnes
 
 def plot_species(statistics, run_dir, view=False, filename='speciation.svg'):
     """Visualizes speciation throughout evolution."""
-    filepath = os.path.join(run_dir, 'speciation', filename)
+    filepath = os.path.join(run_dir, 'stats', filename)
     
     if plt is None:
         warnings.warn("This display is not available due to a missing optional dependency (matplotlib)")
@@ -370,26 +354,25 @@ def save_agent_simulation(genome, config, generation, run_dir, filename=None):
     class SimState:
         def __init__(self):
             self.steps = 0
-            
-            # Randomize beehive position with margin
-            margin = 10
-            self.beehive_pos = (
-                random.uniform(margin, WIDTH - margin),
-                random.uniform(margin, HEIGHT - margin)
-            )
+            self.beehive_pos = (WIDTH/2, HEIGHT/2)
             self.agent = Agent(self.beehive_pos)
             
-            # Make sure this is the same as it is in main if you want sims to look the same as how they are
-            # evaluated
-            # Use the same randomize_reward_position function as in eval
-            self.reward_pos = randomize_reward_position(WIDTH, HEIGHT, REWARD_SIZE, self.beehive_pos, 45, 125)
+            while True:
+                self.reward_pos = (
+                    random.randint(REWARD_SIZE, WIDTH - REWARD_SIZE),
+                    random.randint(REWARD_SIZE, HEIGHT - REWARD_SIZE)
+                )
+                dist_to_home = distance(self.beehive_pos, self.reward_pos)
+                if 50 <= dist_to_home <= 150:
+                    break
 
     state = SimState()
     fig, ax = plt.subplots(figsize=(10, 10))
     
     # Calculate frames for 15 second video at 20 fps
     fps = 20
-    max_frames = 15 * fps  # 15 seconds * 20 frames per second = 300 frames    
+    max_frames = 15 * fps  # 15 seconds * 20 frames per second = 300 frames
+    
     def animation_frame(frame):
         if state.steps >= max_frames or (state.agent.carrying_reward and state.agent.returned_home):
             return []
@@ -549,7 +532,7 @@ def create_run_directory():
         run_dir = os.path.join('runs', f'run_{timestamp}')
         
         # Create main directory and subdirectories
-        subdirs = ['genomes', 'topologies', 'videos', 'speciation', 'config']
+        subdirs = ['genomes', 'visualizations', 'videos', 'stats', 'config']
         os.makedirs(run_dir, exist_ok=True)
         for subdir in subdirs:
             os.makedirs(os.path.join(run_dir, subdir), exist_ok=True)

@@ -1,5 +1,3 @@
-# neat_winter/utilities.py
-
 import os
 import neat
 import math

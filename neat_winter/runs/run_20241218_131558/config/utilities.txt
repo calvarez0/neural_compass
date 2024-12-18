@@ -21,6 +21,9 @@ from neat.genome import DefaultGenome
 import shutil
 from datetime import datetime
 
+def distance(pos1, pos2):
+    return math.sqrt((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)
+
 def randomize_reward_position(width, height, reward_size, beehive_pos, min_distance=25, max_distance=125):
     """Generate reward position within valid distance range from beehive."""
     beehive_x, beehive_y = beehive_pos

@@ -1,5 +1,4 @@
-# neat_winter/constants.py
-
+# Constants
 WIDTH, HEIGHT = 250, 250
 AGENT_SIZE = 5
 REWARD_SIZE = 5

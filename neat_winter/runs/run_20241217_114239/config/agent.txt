@@ -1,4 +1,4 @@
-# neat_winter/agent.py
+# neat50/agent.py
 
 import os
 import neat
@@ -16,34 +16,14 @@ def distance(pos1, pos2):
 
 class Agent:
     def __init__(self, beehive_pos):
-        # Core position and navigation attributes
         self.beehive_position = beehive_pos
         self.start_position = beehive_pos
-        self.x = beehive_pos[0]  # Initialize current position
-        self.y = beehive_pos[1]
-        self.angle = random.randint(0, 360)
-        
-        # Energy management
-        self.energy_default = 4000
-        self.energy = self.energy_default
-        
-        # Memory grid initialization
+        self.energy_default = 6000
+        self.energy = 6000
+        # Initialize memory grid with reduced complexity
         self.grid_cols = WIDTH // GRID_SIZE
         self.grid_rows = HEIGHT // GRID_SIZE
         self.memory_grid = np.zeros((self.grid_rows, self.grid_cols))
-        
-        # State flags
-        self.vision_active = True
-        self.reward_position = None
-        self.carrying_reward = False
-        self.found_reward = False
-        self.returned_home = False
-        
-        # Path tracking
-        self.path_positions = [(self.x, self.y)]
-        self.steps_taken = 0
-        
-        # Call reset to ensure consistent initial state
         self.reset()
         
     def update_memory_grid(self):
@@ -85,7 +65,7 @@ class Agent:
         
         # Update angle with normalized rotation and apply rotation energy cost
         if abs(rotate) > 0:  # If there's any rotation
-            rotation_cost = 25 * (abs(rotate))  # Base cost of 10, scaled by rotation amount
+            rotation_cost = 10 * (abs(rotate))  # Base cost of 10, scaled by rotation amount
             if self.carrying_reward:  # Optional: also make rotation more costly when carrying
                 rotation_cost *= 1.2
             self.energy -= rotation_cost
@@ -109,7 +89,7 @@ class Agent:
             # Energy cost based on speed
             movement_cost = 25 * (abs(speed) / MOVE_SPEED)  # Scale cost with speed
             if self.carrying_reward:  # Higher cost when carrying reward
-                movement_cost *= 1  # Changing from 1.5 to 1 for testing
+                movement_cost *= 1.5
             self.energy -= movement_cost
             
             # Update memory grid after movement
@@ -173,18 +153,11 @@ class Agent:
         path_x, path_y = 0, 0
         if len(self.path_positions) > 1:
             path_window = self.path_positions[-20:]  # Recent path memory
-            max_possible_distance = MOVE_SPEED * len(path_window)  # Maximum distance possible in this window
-            
             for i in range(1, len(path_window)):
-                dx = path_window[i][0] - path_window[i-1][0]
-                dy = path_window[i][1] - path_window[i-1][1]
+                dx = (path_window[i][0] - path_window[i-1][0]) / MOVE_SPEED
+                dy = (path_window[i][1] - path_window[i-1][1]) / MOVE_SPEED
                 path_x += dx
                 path_y += dy
-                
-            # Normalize by maximum possible distance
-            if max_possible_distance > 0:
-                path_x /= max_possible_distance
-                path_y /= max_possible_distance
         
         # Target vector when visible
         if self.vision_active:
