@@ -187,8 +187,7 @@ class Agent:
                 path_y /= max_possible_distance
         
         # Target vector when visible
-        # This didn't check for vision distance and reward at first (just if vision was active)
-        if self.vision_active and distance((self.x, self.y), reward_pos) <= VISION_RANGE:
+        if self.vision_active:
             dx = reward_pos[0] - self.x
             dy = reward_pos[1] - self.y
             distance_to_target = math.sqrt(dx**2 + dy**2) / max(WIDTH, HEIGHT)

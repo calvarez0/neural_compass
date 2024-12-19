@@ -56,7 +56,7 @@ def eval_genome(genome, config):
         else:
             # Calculate optimal path length
             optimal_path = distance(beehive_pos, reward_pos) * 2  # To reward and back
-            # minimum_steps = math.ceil(optimal_path / MOVE_SPEED)  # Minimum theoretical steps needed, disabling for now
+            minimum_steps = math.ceil(optimal_path / MOVE_SPEED)  # Minimum theoretical steps needed
 
             actual_path = sum(distance(p1, p2) for p1, p2 in zip(agent.path_positions[:-1], agent.path_positions[1:]))
             minimum_possible_steps = optimal_path / MOVE_SPEED  # Since agent moves MOVE_SPEED units per step
@@ -64,11 +64,11 @@ def eval_genome(genome, config):
             # Base completion reward
             fitness = 1000
 
-            # # Add non-linear step efficiency reward (otherwise agent takes 400+ steps and wastes time)
-            # step_ratio = minimum_steps / step
-            # step_scalar = 2.0  # Controls how quickly the reward drops off
-            # step_reward = 1000 * (2 / (1 + math.exp(-step_scalar * (step_ratio - 1))) - 1)
-            # fitness += step_reward
+            # Add non-linear step efficiency reward (otherwise agent takes 400+ steps and wastes time)
+            step_ratio = minimum_steps / step
+            step_scalar = 2.0  # Controls how quickly the reward drops off
+            step_reward = 1000 * (2 / (1 + math.exp(-step_scalar * (step_ratio - 1))) - 1)
+            fitness += step_reward
             
             # Path efficiency multiplier that can grow unbounded
             efficiency_ratio = optimal_path / actual_path
