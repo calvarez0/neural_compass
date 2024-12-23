@@ -78,33 +78,6 @@ class Agent:
         
         return memory_values
     
-
-    def is_in_vision_cone(self, target_pos):
-        """
-        Check if a target position is within the agent's vision cone.
-        Returns: bool indicating if target is visible
-        """
-        # First check distance
-        if not self.vision_active:
-            return False
-            
-        dist = distance((self.x, self.y), target_pos)
-        if dist > VISION_RANGE:
-            return False
-        
-        # Calculate angle to target
-        dx = target_pos[0] - self.x
-        dy = target_pos[1] - self.y
-        angle_to_target = math.degrees(math.atan2(dy, dx))
-        
-        # Calculate relative angle (considering agent's current heading)
-        relative_angle = (angle_to_target - self.angle + 360) % 360
-        
-        # Check if target is within the vision cone
-        half_cone = VISION_CONE_ANGLE / 2
-        return relative_angle <= half_cone or relative_angle >= (360 - half_cone)
-
-    
     def update(self, action, reward_pos):
         # Handle rotation and movement
         rotate = action[0]  
@@ -147,7 +120,7 @@ class Agent:
         self.steps_taken += 1
         
         # Vision and reward detection
-        if self.is_in_vision_cone(reward_pos):
+        if self.vision_active and distance((self.x, self.y), reward_pos) <= VISION_RANGE:
             self.reward_position = reward_pos
             if not self.found_reward:
                 self.found_reward = True

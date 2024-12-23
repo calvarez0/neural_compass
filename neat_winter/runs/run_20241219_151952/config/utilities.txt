@@ -382,16 +382,14 @@ def save_agent_simulation(genome, config, generation, run_dir, filename=None):
             # Make sure this is the same as it is in main if you want sims to look the same as how they are
             # evaluated
             # Use the same randomize_reward_position function as in eval
-            self.reward_pos = randomize_reward_position(WIDTH, HEIGHT, REWARD_SIZE, self.beehive_pos, 45, 175)
+            self.reward_pos = randomize_reward_position(WIDTH, HEIGHT, REWARD_SIZE, self.beehive_pos, 45, 125)
 
     state = SimState()
     fig, ax = plt.subplots(figsize=(10, 10))
     
     # Calculate frames for 15 second video at 20 fps
     fps = 20
-    max_frames = 15 * fps  # 15 seconds * 20 frames per second = 300 frames
-
-
+    max_frames = 15 * fps  # 15 seconds * 20 frames per second = 300 frames    
     def animation_frame(frame):
         if state.steps >= max_frames or (state.agent.carrying_reward and state.agent.returned_home):
             return []
@@ -416,29 +414,11 @@ def save_agent_simulation(genome, config, generation, run_dir, filename=None):
             artists.append(line)
         
         # Draw vision cone
-    if state.agent.vision_active:
-        # Calculate cone edges
-        half_cone = VISION_CONE_ANGLE / 2
-        left_angle = math.radians(state.agent.angle - half_cone)
-        right_angle = math.radians(state.agent.angle + half_cone)
-        
-        # Create cone points
-        cone_points = [
-            (state.agent.x, state.agent.y),
-            (state.agent.x + VISION_RANGE * math.cos(left_angle),
-             state.agent.y + VISION_RANGE * math.sin(left_angle)),
-            (state.agent.x + VISION_RANGE * math.cos(right_angle),
-             state.agent.y + VISION_RANGE * math.sin(right_angle))
-        ]
-        
-        # Draw filled cone
-        cone = patches.Polygon(
-            cone_points,
-            color='green',
-            alpha=0.1
-        )
-        ax.add_patch(cone)
-        artists.append(cone)
+        if state.agent.vision_active:
+            end_x = state.agent.x + VISION_RANGE * math.cos(math.radians(state.agent.angle))
+            end_y = state.agent.y + VISION_RANGE * math.sin(math.radians(state.agent.angle))
+            line, = ax.plot([state.agent.x, end_x], [state.agent.y, end_y], 'g-', alpha=0.3)
+            artists.append(line)
         
         # Draw agent
         agent_circle = patches.Circle(

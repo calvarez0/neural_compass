@@ -33,11 +33,11 @@ def eval_genome(genome, config):
             random.uniform(margin, HEIGHT- margin)
         )
         agent = Agent(beehive_pos)
-        reward_pos = randomize_reward_position(WIDTH, HEIGHT, REWARD_SIZE, beehive_pos, 45, 175)
+        reward_pos = randomize_reward_position(WIDTH, HEIGHT, REWARD_SIZE, beehive_pos, 45, 125)
         
         max_steps = 1000
 
-        # this is the loop that happens during testing
+        # this is the loop that happens during the simulation
         for step in range(max_steps):
             inputs = agent.get_sensor_data(reward_pos)
             outputs = net.activate(inputs)
@@ -46,7 +46,7 @@ def eval_genome(genome, config):
             if done or agent.energy <= 0:  # if agent runs out of energy, break loop
                 break
         
-        # after test sim (not during) agent gets rewarded 
+        # after simulation (not during) agent gets rewarded 
         if not agent.found_reward:
             fitness = -1000
         elif not agent.carrying_reward:
@@ -186,7 +186,7 @@ def run_neat_with_visualization(checkpoint_frequency=50, continue_frequency=500)
     return run_dir
 
 def main():
-    run_neat_with_visualization(checkpoint_frequency=25, continue_frequency=2500)
+    run_neat_with_visualization(checkpoint_frequency=25, continue_frequency=500)
 
 if __name__ == '__main__':
     main()

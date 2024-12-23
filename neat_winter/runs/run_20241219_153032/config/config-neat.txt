@@ -7,12 +7,12 @@ reset_on_extinction  = True
 [DefaultGenome]
 # node activation options
 activation_default      = tanh
-activation_mutate_rate = 0.4
+activation_mutate_rate = 0.1
 activation_options     = tanh sigmoid
 
 # node add/remove rates
 node_add_prob          = 0.4
-node_delete_prob       = 0.4
+node_delete_prob       = 0.2
 
 # network parameters
 num_hidden              = 0
@@ -23,11 +23,11 @@ feed_forward          = False
 
 # connection add/remove rates
 conn_add_prob          = 0.4
-conn_delete_prob       = 0.4
+conn_delete_prob       = 0.2
 
 # connection enable options
 enabled_default         = True
-enabled_mutate_rate    = 0.4
+enabled_mutate_rate    = 0.2
 
 # node bias options
 bias_init_mean          = 0.0
@@ -35,7 +35,7 @@ bias_init_stdev         = 1.0
 bias_max_value          = 30.0
 bias_min_value          = -30.0
 bias_mutate_power       = 0.5
-bias_mutate_rate        = 0.4
+bias_mutate_rate        = 0.1
 bias_replace_rate       = 0.05
 
 # connection weight options
@@ -44,7 +44,7 @@ weight_init_stdev       = 1.0
 weight_max_value        = 30
 weight_min_value        = -30
 weight_mutate_power     = 0.5
-weight_mutate_rate      = 0.4
+weight_mutate_rate      = 0.1
 weight_replace_rate     = 0.05
 
 # node response options
@@ -53,14 +53,14 @@ response_init_stdev     = 0.0
 response_max_value      = 30.0
 response_min_value      = -30.0
 response_mutate_power   = 0.5
-response_mutate_rate    = 0.4
+response_mutate_rate    = 0.1
 
 # this one seems to make a big difference on entire simulation
 response_replace_rate   = 0.05
 
 # node aggregation options
 aggregation_default     = sum
-aggregation_mutate_rate = 0.1
+aggregation_mutate_rate = 0.0
 aggregation_options     = sum
 
 # genome compatibility options

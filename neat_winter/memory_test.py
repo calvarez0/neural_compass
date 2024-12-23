@@ -154,10 +154,10 @@ def run_simulation(genome_path):
         return artists
     
     # Create animation with proper blitting
-    anim = FuncAnimation(fig, update, interval=5, blit=True)
+    anim = FuncAnimation(fig, update, interval=150, blit=True)
     plt.show()
 
 if __name__ == "__main__":
     # Specify the path to your genome file
-    genome_path = "runs/run_20241218_131646_VERYGOOD/genomes/champion_genome_gen1150.pkl"  # Update this path
+    genome_path = "runs/run_20241219_155759/genomes/champion_genome_gen2000.pkl"  # Update this path
     run_simulation(genome_path)
