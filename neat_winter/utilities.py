@@ -416,44 +416,44 @@ def save_agent_simulation(genome, config, generation, run_dir, filename=None):
             artists.append(line)
         
         # Draw vision cone
-    if state.agent.vision_active:
-        # Calculate cone edges
-        half_cone = VISION_CONE_ANGLE / 2
-        left_angle = math.radians(state.agent.angle - half_cone)
-        right_angle = math.radians(state.agent.angle + half_cone)
-        
-        # Create cone points
-        cone_points = [
-            (state.agent.x, state.agent.y),
-            (state.agent.x + VISION_RANGE * math.cos(left_angle),
-             state.agent.y + VISION_RANGE * math.sin(left_angle)),
-            (state.agent.x + VISION_RANGE * math.cos(right_angle),
-             state.agent.y + VISION_RANGE * math.sin(right_angle))
-        ]
-        
-        # Draw filled cone
-        cone = patches.Polygon(
-            cone_points,
-            color='green',
-            alpha=0.1
-        )
-        ax.add_patch(cone)
-        artists.append(cone)
-        
-        # Draw agent
-        agent_circle = patches.Circle(
-            (state.agent.x, state.agent.y),
-            AGENT_SIZE,
-            color='red' if state.agent.carrying_reward else 'green'
-        )
-        ax.add_patch(agent_circle)
-        artists.append(agent_circle)
-        
-        # Draw direction indicator
-        end_x = state.agent.x + AGENT_SIZE * 2 * math.cos(math.radians(state.agent.angle))
-        end_y = state.agent.y + AGENT_SIZE * 2 * math.sin(math.radians(state.agent.angle))
-        line, = ax.plot([state.agent.x, end_x], [state.agent.y, end_y], 'k-', linewidth=2)
-        artists.append(line)
+        if state.agent.vision_active:
+            # Calculate cone edges
+            half_cone = VISION_CONE_ANGLE / 2
+            left_angle = math.radians(state.agent.angle - half_cone)
+            right_angle = math.radians(state.agent.angle + half_cone)
+            
+            # Create cone points
+            cone_points = [
+                (state.agent.x, state.agent.y),
+                (state.agent.x + VISION_RANGE * math.cos(left_angle),
+                state.agent.y + VISION_RANGE * math.sin(left_angle)),
+                (state.agent.x + VISION_RANGE * math.cos(right_angle),
+                state.agent.y + VISION_RANGE * math.sin(right_angle))
+            ]
+            
+            # Draw filled cone
+            cone = patches.Polygon(
+                cone_points,
+                color='green',
+                alpha=0.1
+            )
+            ax.add_patch(cone)
+            artists.append(cone)
+            
+            # Draw agent
+            agent_circle = patches.Circle(
+                (state.agent.x, state.agent.y),
+                AGENT_SIZE,
+                color='red' if state.agent.carrying_reward else 'green'
+            )
+            ax.add_patch(agent_circle)
+            artists.append(agent_circle)
+            
+            # Draw direction indicator
+            end_x = state.agent.x + AGENT_SIZE * 2 * math.cos(math.radians(state.agent.angle))
+            end_y = state.agent.y + AGENT_SIZE * 2 * math.sin(math.radians(state.agent.angle))
+            line, = ax.plot([state.agent.x, end_x], [state.agent.y, end_y], 'k-', linewidth=2)
+            artists.append(line)
         
         # Draw beehive and reward
         beehive_rect = patches.Rectangle(
