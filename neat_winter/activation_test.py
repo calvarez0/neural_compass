@@ -273,5 +273,5 @@ def run_simulation(genome_path):
 
 if __name__ == "__main__":
     # Specify the path to your genome file
-    genome_path = "runs/run_20241219_155759/genomes/champion_genome_gen2000.pkl"  # Update this path
+    genome_path = "runs/run_20241227_094534/genomes/champion_genome_gen3450.pkl"  # Update this path
     run_simulation(genome_path)

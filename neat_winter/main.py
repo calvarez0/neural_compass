@@ -33,7 +33,7 @@ def eval_genome(genome, config):
             random.uniform(margin, HEIGHT- margin)
         )
         agent = Agent(beehive_pos)
-        reward_pos = randomize_reward_position(WIDTH, HEIGHT, REWARD_SIZE, beehive_pos, 45, 175)
+        reward_pos = randomize_reward_position(WIDTH, HEIGHT, REWARD_SIZE, beehive_pos, 55, 175)
         
         max_steps = 1000
 
@@ -186,7 +186,7 @@ def run_neat_with_visualization(checkpoint_frequency=50, continue_frequency=500)
     return run_dir
 
 def main():
-    run_neat_with_visualization(checkpoint_frequency=25, continue_frequency=2500)
+    run_neat_with_visualization(checkpoint_frequency=50, continue_frequency=5000)
 
 if __name__ == '__main__':
     main()

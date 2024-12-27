@@ -417,19 +417,29 @@ def save_agent_simulation(genome, config, generation, run_dir, filename=None):
         
         # Draw vision cone
         if state.agent.vision_active:
-            # Calculate cone edges
+            # Calculate cone edges with multiple points for smooth arc
             half_cone = VISION_CONE_ANGLE / 2
-            left_angle = math.radians(state.agent.angle - half_cone)
-            right_angle = math.radians(state.agent.angle + half_cone)
+            start_angle = math.radians(state.agent.angle - half_cone)
+            end_angle = math.radians(state.agent.angle + half_cone)
+            
+            # Create array of angles for arc
+            num_points = 50  # Number of points to create smooth arc
+            if end_angle < start_angle:
+                # Handle case where arc crosses 0/360 boundary
+                angles = np.concatenate([
+                    np.linspace(start_angle, 2*math.pi, num_points//2),
+                    np.linspace(0, end_angle, num_points//2)
+                ])
+            else:
+                angles = np.linspace(start_angle, end_angle, num_points)
             
             # Create cone points
-            cone_points = [
-                (state.agent.x, state.agent.y),
-                (state.agent.x + VISION_RANGE * math.cos(left_angle),
-                state.agent.y + VISION_RANGE * math.sin(left_angle)),
-                (state.agent.x + VISION_RANGE * math.cos(right_angle),
-                state.agent.y + VISION_RANGE * math.sin(right_angle))
-            ]
+            cone_points = [(state.agent.x, state.agent.y)]  # Start with center point
+            for angle in angles:
+                cone_points.append((
+                    state.agent.x + VISION_RANGE * math.cos(angle),
+                    state.agent.y + VISION_RANGE * math.sin(angle)
+                ))
             
             # Draw filled cone
             cone = patches.Polygon(
@@ -502,7 +512,7 @@ def save_agent_simulation(genome, config, generation, run_dir, filename=None):
                         interval=50, blit=True)
     
     # Save animation with consistent fps
-    writer = animation.FFMpegWriter(fps=fps, bitrate=2000)
+    writer = animation.FFMpegWriter(fps=fps, bitrate=200)
     anim.save(filepath, writer=writer)
     plt.close()
     print(f"Simulation saved as '{filepath}'")
