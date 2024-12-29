@@ -1,0 +1,254 @@
+# neat_winter/agent.py
+
+import os
+import neat
+import math
+import random
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.animation import FuncAnimation
+from utilities import *
+from constants import *
+
+def distance(pos1, pos2):
+    return math.sqrt((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)
+
+class Agent:
+    def __init__(self, beehive_pos):
+        # Core position and navigation attributes
+        self.beehive_position = beehive_pos
+        self.start_position = beehive_pos
+        self.x = beehive_pos[0]  # Initialize current position
+        self.y = beehive_pos[1]
+        self.angle = random.randint(0, 360)
+        
+        # Energy management
+        self.energy_default = 4000
+        self.energy = self.energy_default
+        
+        # Memory grid initialization
+        self.grid_cols = WIDTH // GRID_SIZE
+        self.grid_rows = HEIGHT // GRID_SIZE
+        self.memory_grid = np.zeros((self.grid_rows, self.grid_cols))
+        
+        # State flags
+        self.vision_active = True
+        self.reward_position = None
+        self.carrying_reward = False
+        self.found_reward = False
+        self.returned_home = False
+        
+        # Path tracking
+        self.path_positions = [(self.x, self.y)]
+        self.steps_taken = 0
+        
+        # Call reset to ensure consistent initial state
+        self.reset()
+        
+    def update_memory_grid(self):
+        """Update memory grid with current position and apply decay"""
+        grid_x = int(self.x // GRID_SIZE)
+        grid_y = int(self.y // GRID_SIZE)
+        
+        # Ensure grid coordinates are within bounds
+        grid_x = max(0, min(grid_x, self.grid_cols - 1))
+        grid_y = max(0, min(grid_y, self.grid_rows - 1))
+        
+        # Mark current position with maximum value
+        self.memory_grid[grid_y, grid_x] = 1.0
+        
+        # Apply memory decay
+        self.memory_grid *= MEMORY_DECAY
+        
+    def get_local_memory(self):
+        """Get memory values for surrounding cells"""
+        grid_x = int(self.x // GRID_SIZE)
+        grid_y = int(self.y // GRID_SIZE)
+        
+        memory_values = []
+        for dy in [-1, 0, 1]:
+            for dx in [-1, 0, 1]:
+                y = grid_y + dy
+                x = grid_x + dx
+                if 0 <= x < self.grid_cols and 0 <= y < self.grid_rows:
+                    memory_values.append(self.memory_grid[y, x])
+                else:
+                    memory_values.append(0.0)
+        
+        return memory_values
+    
+
+    def is_in_vision_cone(self, target_pos):
+        """
+        Check if a target position is within the agent's vision cone.
+        Returns: bool indicating if target is visible
+        """
+        # First check distance
+        if not self.vision_active:
+            return False
+            
+        dist = distance((self.x, self.y), target_pos)
+        if dist > VISION_RANGE:
+            return False
+        
+        # Calculate angle to target
+        dx = target_pos[0] - self.x
+        dy = target_pos[1] - self.y
+        angle_to_target = math.degrees(math.atan2(dy, dx))
+        
+        # Calculate relative angle (considering agent's current heading)
+        relative_angle = (angle_to_target - self.angle + 360) % 360
+        
+        # Check if target is within the vision cone
+        half_cone = VISION_CONE_ANGLE / 2
+        return relative_angle <= half_cone or relative_angle >= (360 - half_cone)
+
+    
+    def update(self, action, reward_pos):
+        # Handle rotation and movement
+        rotate = action[0]  
+        speed = action[1] * MOVE_SPEED
+        
+        # Update angle with normalized rotation and apply rotation energy cost
+        if abs(rotate) > 0:  # If there's any rotation
+            rotation_cost = 25 * (abs(rotate))  # Base cost of 10, scaled by rotation amount
+            if self.carrying_reward:  # Optional: also make rotation more costly when carrying
+                rotation_cost *= 1.2
+            self.energy -= rotation_cost
+        
+        self.angle = (self.angle + rotate * ROTATION_SPEED) % 360
+        
+        # Calculate new position if there's any movement
+        if abs(speed) > 0:  # Check if there's any movement
+            # Calculate new position
+            dx = math.cos(math.radians(self.angle)) * speed
+            dy = math.sin(math.radians(self.angle)) * speed
+            new_x = self.x + dx
+            new_y = self.y + dy
+            
+            # Boundary checking
+            if 0 <= new_x <= WIDTH:
+                self.x = new_x
+            if 0 <= new_y <= HEIGHT:
+                self.y = new_y
+
+            # Energy cost based on speed
+            movement_cost = 25 * (abs(speed) / MOVE_SPEED)  # Scale cost with speed
+            if self.carrying_reward:  # Higher cost when carrying reward
+                movement_cost *= 1  # Changing from 1.5 to 1 for testing
+            self.energy -= movement_cost
+            
+            # Update memory grid after movement
+            self.update_memory_grid()
+
+        # Track path and steps
+        self.path_positions.append((self.x, self.y))
+        self.steps_taken += 1
+        
+        # Vision and reward detection
+        if self.is_in_vision_cone(reward_pos):
+            self.reward_position = reward_pos
+            if not self.found_reward:
+                self.found_reward = True
+        
+        # Reward pickup
+        if self.reward_position and not self.carrying_reward:
+            if distance((self.x, self.y), reward_pos) <= AGENT_SIZE + REWARD_SIZE:
+                self.carrying_reward = True
+        
+        # Return to hive
+        if self.carrying_reward and distance((self.x, self.y), self.beehive_position) <= AGENT_SIZE + BEEHIVE_SIZE:
+            self.returned_home = True
+            return True
+            
+        # Energy depletion check
+        if self.energy <= 0:
+            return True
+            
+        return False
+        
+    def reset(self):
+        """Reset agent state for new episode"""
+        self.x = self.start_position[0]
+        self.y = self.start_position[1]
+        self.angle = random.randint(0, 360)
+        self.vision_active = True
+        self.reward_position = None
+        self.carrying_reward = False
+        self.path_positions = [(self.x, self.y)]
+        self.steps_taken = 0
+        self.found_reward = False
+        self.returned_home = False
+        self.memory_grid.fill(0)
+        
+    def get_sensor_data(self, reward_pos):
+        """
+        Get sensor data including spatial memory
+        Returns 17 inputs total:
+        - Current heading vector (2)
+        - Path integration vector (2)
+        - Target vector (2, zeroed when not visible)
+        - Binary state flags (2)
+        - Local memory grid values (9)
+        """
+        # Heading vector
+        heading_x = math.cos(math.radians(self.angle))
+        heading_y = math.sin(math.radians(self.angle))
+        
+        # Path integration
+        path_x, path_y = 0, 0
+        if len(self.path_positions) > 1:
+            path_window = self.path_positions[-20:]  # Recent path memory
+            max_possible_distance = MOVE_SPEED * len(path_window)  # Maximum distance possible in this window
+            
+            for i in range(1, len(path_window)):
+                dx = path_window[i][0] - path_window[i-1][0]
+                dy = path_window[i][1] - path_window[i-1][1]
+                path_x += dx
+                path_y += dy
+                
+            # Normalize by maximum possible distance
+            if max_possible_distance > 0:
+                path_x /= max_possible_distance
+                path_y /= max_possible_distance
+        
+        # Target vector changes based on whether we're returning home or searching
+        if self.carrying_reward:
+            # Target is beehive when carrying reward
+            if self.vision_active and distance((self.x, self.y), self.beehive_position) <= VISION_RANGE:
+                dx = self.beehive_position[0] - self.x
+                dy = self.beehive_position[1] - self.y
+                distance_to_target = math.sqrt(dx**2 + dy**2) / max(WIDTH, HEIGHT)
+                angle_to_target = math.degrees(math.atan2(dy, dx)) - self.angle
+                angle_to_target = (angle_to_target + 360) % 360
+                target_angle = angle_to_target / 180.0
+                target_distance = distance_to_target
+            else:
+                target_angle = 0
+                target_distance = 0
+        else:
+            # Target is reward when searching
+            if self.vision_active and distance((self.x, self.y), reward_pos) <= VISION_RANGE:
+                dx = reward_pos[0] - self.x
+                dy = reward_pos[1] - self.y
+                distance_to_target = math.sqrt(dx**2 + dy**2) / max(WIDTH, HEIGHT)
+                angle_to_target = math.degrees(math.atan2(dy, dx)) - self.angle
+                angle_to_target = (angle_to_target + 360) % 360
+                target_angle = angle_to_target / 180.0
+                target_distance = distance_to_target
+            else:
+                target_angle = 0
+                target_distance = 0
+        
+        # Get local memory values
+        memory_values = self.get_local_memory()
+        
+        return [
+            heading_x, heading_y,      # Current heading vector
+            path_x, path_y,           # Integrated path vector
+            target_angle, target_distance,  # Target vector
+            1.0 if self.carrying_reward else 0.0,  # Carrying state
+            1.0 if self.vision_active else 0.0,    # Vision state
+            *memory_values            # Local memory grid values
+        ]

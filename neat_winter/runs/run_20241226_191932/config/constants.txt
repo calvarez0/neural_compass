@@ -1,0 +1,15 @@
+# neat_winter/constants.py
+
+WIDTH, HEIGHT = 250, 250
+AGENT_SIZE = 5
+REWARD_SIZE = 5
+BEEHIVE_SIZE = 10
+VISION_RANGE = 50
+VISION_CONE_ANGLE = 270  # Field of view in degrees
+ROTATION_SPEED = 50
+MOVE_SPEED = 10  # Maximum speed (can go from -10 to 10)
+MAX_STEPS = 100000     # Reduced from 1000 to make episodes shorter
+
+# Constants for memory grid
+GRID_SIZE = 25  # Size of each grid cell
+MEMORY_DECAY = 0.9999  # Rate at which memory fades
