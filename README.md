@@ -2,7 +2,7 @@
 
 A Python implementation of neuroevolution using NEAT (NeuroEvolution of Augmenting Topologies) to train agents for foraging behavior. The agents learn to navigate their environment, locate rewards, and return to their home base (similar to a bee leaving the hive and returning with pollen).
 
-These are early research experiments inspired by Dr. Gaby Maimon's Drosophila neural circuitry for navigation. Although I can't share all my business or research code, I strongly believe in openly sharing as much code as possible for research rather than falling into the common trap of defensiveness or gatekeeping seen among researchers.
+These are early research experiments inspired by Dr. Gaby Maimon's Drosophila neural circuitry for navigation. I can't share all my commercial or research code since I'm often not the sole contributor but I strongly believe in openly sharing as much code as possible for research rather than falling into the common trap of defensiveness or gatekeeping seen among researchers.
 
 The rest of this readme is AI-generated.
 
