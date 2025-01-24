@@ -408,5 +408,5 @@ def visualize_agent_and_compass(genome_path):
     plt.show()
 
 if __name__ == "__main__":
-    genome_path = "runs/run_20241227_142436/genomes/champion_genome_gen1000.pkl"
+    genome_path = "runs/run_20241229_004508/genomes/champion_genome_gen1600.pkl"
     visualize_agent_and_compass(genome_path)  # Call new visualization function
