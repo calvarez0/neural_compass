@@ -8,11 +8,7 @@ VISION_RANGE = 100
 VISION_CONE_ANGLE = 90  # Field of view in degrees
 ROTATION_SPEED = 50
 MOVE_SPEED = 10  # Maximum speed (can go from -10 to 10)
-MAX_STEPS = 500     # Reduced from 1000 to make episodes shorter
-
-# Distance from hive to pollen
-MIN_DISTANCE = 100
-MAX_DISTANCE = 200
+MAX_STEPS = 100000     # Reduced from 1000 to make episodes shorter
 
 # Constants for memory grid - Enhanced values
 GRID_SIZE = 12  # Reduced from 25 to make finer grid resolution

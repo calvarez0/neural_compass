@@ -205,13 +205,12 @@ class Agent:
         self.vision_active = True
         self.reward_position = None
         self.carrying_reward = False
-        self.path_positions = [(self.x, self.y, 0)]  # Include timestamp
+        self.path_positions = [(self.x, self.y)]
         self.steps_taken = 0
         self.found_reward = False
         self.returned_home = False
         self.memory_grid.fill(0)
-        self.memory_intensity.fill(1.0)  # Reset intensity values
-            
+        
     def get_sensor_data(self, reward_pos):
         """Enhanced sensor data with improved path integration"""
         # Basic heading vector
@@ -221,8 +220,8 @@ class Agent:
         # Enhanced path integration with temporal weighting
         path_x, path_y = 0, 0
         if len(self.path_positions) > 1:
-            # Get positions from path memory, ensuring we handle 3-tuples correctly
-            path_window = [pos[:2] for pos in self.path_positions[-PATH_MEMORY_LENGTH:]]  # Only take x,y coords
+            # Use longer path window
+            path_window = self.path_positions[-PATH_MEMORY_LENGTH:]
             max_possible_distance = MOVE_SPEED * len(path_window)
             
             # Calculate weighted path integration
@@ -241,7 +240,7 @@ class Agent:
                 path_x = (path_x / total_weight) / max_possible_distance
                 path_y = (path_y / total_weight) / max_possible_distance
         
-        # Target vector handling
+        # Target vector handling (keeping existing logic)
         if self.carrying_reward:
             if self.vision_active and distance((self.x, self.y), self.beehive_position) <= VISION_RANGE:
                 dx = self.beehive_position[0] - self.x

@@ -382,7 +382,7 @@ def save_agent_simulation(genome, config, generation, run_dir, filename=None):
             # Make sure this is the same as it is in main if you want sims to look the same as how they are
             # evaluated
             # Use the same randomize_reward_position function as in eval
-            self.reward_pos = randomize_reward_position(WIDTH, HEIGHT, REWARD_SIZE, self.beehive_pos, MIN_DISTANCE, MAX_DISTANCE)
+            self.reward_pos = randomize_reward_position(WIDTH, HEIGHT, REWARD_SIZE, self.beehive_pos, 45, 175)
 
     state = SimState()
     fig, ax = plt.subplots(figsize=(10, 10))

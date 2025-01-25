@@ -19,7 +19,7 @@ class Agent:
         # Core position and navigation attributes
         self.beehive_position = beehive_pos
         self.start_position = beehive_pos
-        self.x = beehive_pos[0]
+        self.x = beehive_pos[0]  # Initialize current position
         self.y = beehive_pos[1]
         self.angle = random.randint(0, 360)
         
@@ -27,11 +27,10 @@ class Agent:
         self.energy_default = 4000
         self.energy = self.energy_default
         
-        # Enhanced memory grid initialization
-        self.grid_cols = math.ceil(WIDTH / GRID_SIZE)
-        self.grid_rows = math.ceil(HEIGHT / GRID_SIZE)
+        # Memory grid initialization
+        self.grid_cols = WIDTH // GRID_SIZE
+        self.grid_rows = HEIGHT // GRID_SIZE
         self.memory_grid = np.zeros((self.grid_rows, self.grid_cols))
-        self.memory_intensity = np.ones((self.grid_rows, self.grid_cols))  # New: track intensity separately
         
         # State flags
         self.vision_active = True
@@ -40,15 +39,15 @@ class Agent:
         self.found_reward = False
         self.returned_home = False
         
-        # Enhanced path tracking with timestamps
-        self.path_positions = [(self.x, self.y, 0)]  # (x, y, timestamp)
+        # Path tracking
+        self.path_positions = [(self.x, self.y)]
         self.steps_taken = 0
         
-        # Reset to ensure consistent initial state
+        # Call reset to ensure consistent initial state
         self.reset()
         
     def update_memory_grid(self):
-        """Enhanced memory grid update with intensity tracking"""
+        """Update memory grid with current position and apply decay"""
         grid_x = int(self.x // GRID_SIZE)
         grid_y = int(self.y // GRID_SIZE)
         
@@ -56,48 +55,28 @@ class Agent:
         grid_x = max(0, min(grid_x, self.grid_cols - 1))
         grid_y = max(0, min(grid_y, self.grid_rows - 1))
         
-        # Enhanced memory marking with variable intensity
-        base_intensity = MEMORY_INTENSITY
-        if self.carrying_reward:
-            base_intensity *= 1.5  # Stronger memories when carrying reward
+        # Mark current position with maximum value
+        self.memory_grid[grid_y, grid_x] = 1.0
         
-        # Mark current position and surrounding cells with intensity gradient
-        for dy in [-1, 0, 1]:
-            for dx in [-1, 0, 1]:
-                ny, nx = grid_y + dy, grid_x + dx
-                if 0 <= nx < self.grid_cols and 0 <= ny < self.grid_rows:
-                    distance = math.sqrt(dx*dx + dy*dy)
-                    intensity = base_intensity / (1 + distance)
-                    self.memory_grid[ny, nx] = max(self.memory_grid[ny, nx], intensity)
-                    self.memory_intensity[ny, nx] = max(self.memory_intensity[ny, nx], intensity)
-        
-        # Apply memory decay with variable rate
-        decay_mask = self.memory_grid > 0
-        self.memory_grid[decay_mask] *= MEMORY_DECAY
-        self.memory_intensity[decay_mask] *= MEMORY_DECAY
+        # Apply memory decay
+        self.memory_grid *= MEMORY_DECAY
         
     def get_local_memory(self):
-        """Enhanced local memory retrieval with intensity weighting"""
+        """Get memory values for surrounding cells"""
         grid_x = int(self.x // GRID_SIZE)
         grid_y = int(self.y // GRID_SIZE)
         
         memory_values = []
-        intensity_values = []
-        
-        # Get both memory and intensity values for surrounding cells
         for dy in [-1, 0, 1]:
             for dx in [-1, 0, 1]:
-                y, x = grid_y + dy, grid_x + dx
+                y = grid_y + dy
+                x = grid_x + dx
                 if 0 <= x < self.grid_cols and 0 <= y < self.grid_rows:
                     memory_values.append(self.memory_grid[y, x])
-                    intensity_values.append(self.memory_intensity[y, x])
                 else:
                     memory_values.append(0.0)
-                    intensity_values.append(0.0)
         
-        # Combine memory and intensity into weighted memory values
-        weighted_memory = [m * i for m, i in zip(memory_values, intensity_values)]
-        return weighted_memory
+        return memory_values
     
 
     def is_in_vision_cone(self, target_pos):
@@ -132,15 +111,15 @@ class Agent:
         
         # Update angle with normalized rotation and apply rotation energy cost
         if abs(rotate) > 0:  # If there's any rotation
-            rotation_cost = 25 * (abs(rotate))
-            if self.carrying_reward:
+            rotation_cost = 25 * (abs(rotate))  # Base cost of 10, scaled by rotation amount
+            if self.carrying_reward:  # Optional: also make rotation more costly when carrying
                 rotation_cost *= 1.2
             self.energy -= rotation_cost
         
         self.angle = (self.angle + rotate * ROTATION_SPEED) % 360
         
         # Calculate new position if there's any movement
-        if abs(speed) > 0:
+        if abs(speed) > 0:  # Check if there's any movement
             # Calculate new position
             dx = math.cos(math.radians(self.angle)) * speed
             dy = math.sin(math.radians(self.angle)) * speed
@@ -154,37 +133,29 @@ class Agent:
                 self.y = new_y
 
             # Energy cost based on speed
-            movement_cost = 25 * (abs(speed) / MOVE_SPEED)
-            if self.carrying_reward:
-                movement_cost *= 1
+            movement_cost = 25 * (abs(speed) / MOVE_SPEED)  # Scale cost with speed
+            if self.carrying_reward:  # Higher cost when carrying reward
+                movement_cost *= 1  # Changing from 1.5 to 1 for testing
             self.energy -= movement_cost
             
             # Update memory grid after movement
             self.update_memory_grid()
 
-        # Enhanced path tracking with timestamp
-        self.path_positions.append((self.x, self.y, self.steps_taken))
+        # Track path and steps
+        self.path_positions.append((self.x, self.y))
         self.steps_taken += 1
-        
-        # Trim path history to PATH_MEMORY_LENGTH
-        if len(self.path_positions) > PATH_MEMORY_LENGTH:
-            self.path_positions = self.path_positions[-PATH_MEMORY_LENGTH:]
         
         # Vision and reward detection
         if self.is_in_vision_cone(reward_pos):
             self.reward_position = reward_pos
             if not self.found_reward:
                 self.found_reward = True
-                # Intensify memory at found reward location
-                self.update_memory_grid()
         
         # Reward pickup and vision deactivation
         if self.reward_position and not self.carrying_reward:
             if distance((self.x, self.y), reward_pos) <= AGENT_SIZE + REWARD_SIZE:
                 self.carrying_reward = True
-                self.vision_active = True
-                # Intensify memory at pickup location
-                self.update_memory_grid()
+                self.vision_active = True  # Turn off vision after picking up reward
         
         # Return to hive
         if self.carrying_reward and distance((self.x, self.y), self.beehive_position) <= AGENT_SIZE + BEEHIVE_SIZE:
@@ -205,44 +176,46 @@ class Agent:
         self.vision_active = True
         self.reward_position = None
         self.carrying_reward = False
-        self.path_positions = [(self.x, self.y, 0)]  # Include timestamp
+        self.path_positions = [(self.x, self.y)]
         self.steps_taken = 0
         self.found_reward = False
         self.returned_home = False
         self.memory_grid.fill(0)
-        self.memory_intensity.fill(1.0)  # Reset intensity values
-            
+        
     def get_sensor_data(self, reward_pos):
-        """Enhanced sensor data with improved path integration"""
-        # Basic heading vector
+        """
+        Get sensor data including spatial memory
+        Returns 17 inputs total:
+        - Current heading vector (2)
+        - Path integration vector (2)
+        - Target vector (2, zeroed when not visible)
+        - Binary state flags (2)
+        - Local memory grid values (9)
+        """
+        # Heading vector
         heading_x = math.cos(math.radians(self.angle))
         heading_y = math.sin(math.radians(self.angle))
         
-        # Enhanced path integration with temporal weighting
+        # Path integration
         path_x, path_y = 0, 0
         if len(self.path_positions) > 1:
-            # Get positions from path memory, ensuring we handle 3-tuples correctly
-            path_window = [pos[:2] for pos in self.path_positions[-PATH_MEMORY_LENGTH:]]  # Only take x,y coords
-            max_possible_distance = MOVE_SPEED * len(path_window)
+            path_window = self.path_positions[-20:]  # Recent path memory
+            max_possible_distance = MOVE_SPEED * len(path_window)  # Maximum distance possible in this window
             
-            # Calculate weighted path integration
-            total_weight = 0
             for i in range(1, len(path_window)):
-                # More recent positions have higher weight
-                weight = 1.0 - (len(path_window) - i) / len(path_window)
                 dx = path_window[i][0] - path_window[i-1][0]
                 dy = path_window[i][1] - path_window[i-1][1]
-                path_x += dx * weight
-                path_y += dy * weight
-                total_weight += weight
-            
-            # Normalize by total weight and maximum possible distance
-            if total_weight > 0 and max_possible_distance > 0:
-                path_x = (path_x / total_weight) / max_possible_distance
-                path_y = (path_y / total_weight) / max_possible_distance
+                path_x += dx
+                path_y += dy
+                
+            # Normalize by maximum possible distance
+            if max_possible_distance > 0:
+                path_x /= max_possible_distance
+                path_y /= max_possible_distance
         
-        # Target vector handling
+        # Target vector changes based on whether we're returning home or searching
         if self.carrying_reward:
+            # Target is beehive when carrying reward
             if self.vision_active and distance((self.x, self.y), self.beehive_position) <= VISION_RANGE:
                 dx = self.beehive_position[0] - self.x
                 dy = self.beehive_position[1] - self.y
@@ -252,8 +225,10 @@ class Agent:
                 target_angle = angle_to_target / 180.0
                 target_distance = distance_to_target
             else:
-                target_angle, target_distance = 0, 0
+                target_angle = 0
+                target_distance = 0
         else:
+            # Target is reward when searching
             if self.vision_active and distance((self.x, self.y), reward_pos) <= VISION_RANGE:
                 dx = reward_pos[0] - self.x
                 dy = reward_pos[1] - self.y
@@ -263,16 +238,17 @@ class Agent:
                 target_angle = angle_to_target / 180.0
                 target_distance = distance_to_target
             else:
-                target_angle, target_distance = 0, 0
+                target_angle = 0
+                target_distance = 0
         
-        # Get enhanced local memory values
+        # Get local memory values
         memory_values = self.get_local_memory()
         
         return [
-            heading_x, heading_y,                    # Current heading vector
-            path_x, path_y,                         # Enhanced path integration vector
-            target_angle, target_distance,          # Target vector
-            1.0 if self.carrying_reward else 0.0,   # Carrying state
-            1.0 if self.vision_active else 0.0,     # Vision state
-            *memory_values                          # Enhanced weighted memory values
+            heading_x, heading_y,      # Current heading vector
+            path_x, path_y,           # Integrated path vector
+            target_angle, target_distance,  # Target vector
+            1.0 if self.carrying_reward else 0.0,  # Carrying state
+            1.0 if self.vision_active else 0.0,    # Vision state
+            *memory_values            # Local memory grid values
         ]

@@ -27,24 +27,26 @@ def eval_genome(genome, config):
     total_fitness = 0
     
     for _ in range(num_trials):
-        margin = 10
+        margin = 10  # adjust this value as needed (margin for beehive)
         beehive_pos = (
             random.uniform(margin, WIDTH - margin),
             random.uniform(margin, HEIGHT- margin)
         )
         agent = Agent(beehive_pos)
-        reward_pos = randomize_reward_position(WIDTH, HEIGHT, REWARD_SIZE, beehive_pos, MIN_DISTANCE, MAX_DISTANCE)
+        reward_pos = randomize_reward_position(WIDTH, HEIGHT, REWARD_SIZE, beehive_pos, 100, 200)
         
-        max_steps = MAX_STEPS
+        max_steps = 1000
 
+        # this is the loop that happens during testing
         for step in range(max_steps):
             inputs = agent.get_sensor_data(reward_pos)
             outputs = net.activate(inputs)
             done = agent.update(outputs, reward_pos)
             
-            if done or agent.energy <= 0:
+            if done or agent.energy <= 0:  # if agent runs out of energy, break loop
                 break
         
+        # after test sim (not during) agent gets rewarded 
         if not agent.found_reward:
             fitness = -1000
         elif not agent.carrying_reward:
@@ -53,22 +55,31 @@ def eval_genome(genome, config):
             fitness = -250
         else:
             # Calculate optimal path length
-            optimal_path = distance(beehive_pos, reward_pos) * 2
-            actual_path = sum(distance(p1[:2], p2[:2]) for p1, p2 in zip(agent.path_positions[:-1], agent.path_positions[1:]))
-            minimum_possible_steps = optimal_path / MOVE_SPEED
+            optimal_path = distance(beehive_pos, reward_pos) * 2  # To reward and back
+            # minimum_steps = math.ceil(optimal_path / MOVE_SPEED)  # Minimum theoretical steps needed, disabling for now
+
+            actual_path = sum(distance(p1, p2) for p1, p2 in zip(agent.path_positions[:-1], agent.path_positions[1:]))
+            minimum_possible_steps = optimal_path / MOVE_SPEED  # Since agent moves MOVE_SPEED units per step
             
             # Base completion reward
             fitness = 1000
+
+            # # Add non-linear step efficiency reward (otherwise agent takes 400+ steps and wastes time)
+            # step_ratio = minimum_steps / step
+            # step_scalar = 2.0  # Controls how quickly the reward drops off
+            # step_reward = 1000 * (2 / (1 + math.exp(-step_scalar * (step_ratio - 1))) - 1)
+            # fitness += step_reward
             
-            # Path efficiency bonus with clamping
-            efficiency_ratio = min(optimal_path / max(actual_path, 0.1), 10.0)  # Prevent division by zero and cap ratio
+            # Path efficiency multiplier that can grow unbounded
+            efficiency_ratio = optimal_path / actual_path
             efficiency_bonus = 1000 * math.exp(efficiency_ratio - 1)
             fitness += efficiency_bonus
             
-            # Time efficiency bonus with clamping
-            time_efficiency = min(minimum_possible_steps / max(step, 1), 10.0)  # Prevent division by zero and cap ratio
-            time_bonus = 1000 * math.exp(time_efficiency - 1)
+            # Time efficiency bonus that scales based on how close they got to optimal time
+            time_efficiency = minimum_possible_steps / step  # Will be <= 1.0 for realistic completions
+            time_bonus = 1000 * math.exp(time_efficiency - 1)  # Similar scale to previous bonus but relative to optimal
             fitness += time_bonus
+
             
         total_fitness += fitness
     

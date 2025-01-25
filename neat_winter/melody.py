@@ -399,7 +399,7 @@ def visualize_agent_and_compass(genome_path):
     anim = FuncAnimation(
         fig, update,
         init_func=init,
-        interval=50,
+        interval=100,
         blit=True,
         save_count=1000  # Add this to prevent the warning
     )
@@ -408,5 +408,5 @@ def visualize_agent_and_compass(genome_path):
     plt.show()
 
 if __name__ == "__main__":
-    genome_path = "runs/run_20241229_004508/genomes/champion_genome_gen1600.pkl"
+    genome_path = "runs/run_20250125_123124/genomes/champion_genome_gen100.pkl"
     visualize_agent_and_compass(genome_path)  # Call new visualization function
