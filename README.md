@@ -1,6 +1,10 @@
-# NEAT NEURAL COMPASS
+# NEAT Neural Compass
 
 A Python implementation of neuroevolution using NEAT (NeuroEvolution of Augmenting Topologies) to train agents for foraging behavior. The agents learn to navigate their environment, locate rewards, and return to their home base (similar to a bee leaving the hive and returning with pollen).
+
+![Neural Compass Simulation](readme_vid.gif)
+
+We try to mechanistically interpret the evolved networks to discern how this kind of navigation evolves.
 
 These are early research experiments inspired by Dr. Gaby Maimon's Drosophila neural circuitry for navigation. I can't share all my commercial or research code since I'm often not the sole contributor but I strongly believe in openly sharing as much code as possible for research rather than falling into the common trap of defensiveness or gatekeeping seen among researchers.
 
