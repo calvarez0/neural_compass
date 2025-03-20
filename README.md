@@ -10,8 +10,6 @@ These are early research experiments inspired by Dr. Gaby Maimon's Drosophila ne
 
 The rest of this readme is AI-generated.
 
-![Agent Simulation](simulation.gif)
-
 ## Features
 
 - Advanced agent navigation with vision cone system
